@@ -2,10 +2,13 @@
 
 :root {
   --background: #F8FAFE;
+  --foreground: #171717;
   --primary: #2954bc;
   --muted: #5c6372;
   --card: #ffffff;
   --accent: #c2f3f5;
+  --input: #d1d5db;
+  --border: #e5e7eb;
 }
 
 @theme inline {
@@ -15,17 +18,13 @@
   --color-muted: var(--muted);
   --color-card: var(--card);
   --color-accent: var(--accent);
+  --color-input: var(--input);
+  --color-border: var(--border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
+  color: var(--foreground);
 }
