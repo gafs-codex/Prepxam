@@ -15,11 +15,26 @@ export default function StudentDashboard() {
 
             <section className="mt-10">
                 <div className="flex items-end justify-between gap-4">
-                    <h2>Available exams</h2>
+                    <h2 className="text-lg font-semibold">Available exams</h2>
                     <Link href={``} className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs">Browse All</Link>
                 </div>
 
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <p className="text-sm text-muted">
+                        No published exams yet — check back soon.
+                    </p>
+                </div>
+            </section>
 
+            <section className="mt-10">
+                <div className="flex items-end justify-between gap-4">
+                    <h2 className="text-lg font-semibold">Recent results</h2>
+                    <Link href={``} className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs">Full history</Link>
+                </div>
+
+                <div className="mt-4 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+                    <p className="p-4 text-sm text-muted">You haven't taken any exams yet.</p>
+                </div>
             </section>
         </main>
     )
