@@ -18,7 +18,7 @@ export default function ForgotPassword() {
                                     Send link
                                 </button>
 
-                                <Link href={`/login`} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors text-black w-full py-1.5 px-3 hover:bg-accent">
+                                <Link href={`ath/login`} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors text-black w-full py-1.5 px-3 hover:bg-accent">
                                     Back to login
                                 </Link>
                             </form>

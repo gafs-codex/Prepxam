@@ -32,7 +32,7 @@ export default function Login() {
                                     />
                                     Remember me
                                 </label>
-                                <Link className="text-sm font-medium text-primary hover:underline" href={``}>Forgot password?</Link>
+                                <Link className="text-sm font-medium text-primary hover:underline" href={`/forgot-password`}>Forgot password?</Link>
                             </div>
 
                             <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors bg-primary text-white w-full py-1.5 px-3">
