@@ -13,7 +13,7 @@ import { User, LogOut, Settings } from "lucide-react";
 export default function UserMenu({ name, role }) {
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger aschild>
                 <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 w-9 relative">
                     <User className="h-5 w-5 text-muted" />
                 </button>

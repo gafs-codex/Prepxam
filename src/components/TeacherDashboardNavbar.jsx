@@ -1,18 +1,18 @@
 "use client"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bell, GraduationCap } from "lucide-react";
+import { GraduationCap, Bell } from "lucide-react";
 import UserMenu from "./UserMenu";
 
 const links = [
-    { href: "/student/dashboard", label: "Dashboard" },
-    { href: "/student/exams", label: "Browse exams" },
-    { href: "/student/history", label: "History" },
+    { href: "/Teacher/dashboard", label: "Dashboard" },
+    { href: "/Teacher/exams", label: "My exams" },
+    { href: "/Teacher/question-bank", label: "Question bank" },
+    { href: "/Teacher/students", label: "Students" },
 ];
 
-export default function StudentDashboardNavbar() {
-    const pathname = usePathname();
-
+export default function TeacherDashboardNavbar() {
+    const pathname = usePathname()
     return (
         <nav className="flex items-center justify-between border-b border-border bg-background px-8 py-4">
             <div className='flex items-center gap-2'>
@@ -46,7 +46,7 @@ export default function StudentDashboardNavbar() {
                     <Bell className="h-5 w-5 text-muted" />
                 </button>
 
-                <UserMenu name="Abdulmuiz Abdulgafar" role="Student Account" />
+                <UserMenu name="Ayomide gafar" role="Teacher Account" />
             </div>
         </nav>
     )
