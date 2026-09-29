@@ -8,7 +8,7 @@ export default function HistoryPage() {
             <div className="mt-6 rounded-xl border border-dashed border-border p-10 text-center bg-white">
                 <p className="text-sm text-muted">You haven't taken any exams yet.</p>
 
-                <Link href={`/exams`} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer bg-primary text-white shadow hover:bg-primary/90 h-9 px-4 py-2 mt-4">
+                <Link href={`student/exams`} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer bg-primary text-white shadow hover:bg-primary/90 h-9 px-4 py-2 mt-4">
                     Browse exams
                 </Link>
             </div>

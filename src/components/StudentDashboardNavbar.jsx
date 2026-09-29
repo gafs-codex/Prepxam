@@ -5,9 +5,9 @@ import { Bell, GraduationCap } from "lucide-react";
 import UserMenu from "./UserMenu";
 
 const links = [
-    { href: "/dashboard", label: "Dashboard" },
-    { href: "/exams", label: "Browse exams" },
-    { href: "/history", label: "History" },
+    { href: "student/dashboard", label: "Dashboard" },
+    { href: "student/exams", label: "Browse exams" },
+    { href: "student/history", label: "History" },
 ];
 
 export default function StudentDashboardNavbar() {
