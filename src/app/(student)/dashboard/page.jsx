@@ -1,5 +1,5 @@
 import StatCard from "@/components/ui/StatCard"
-import { StatData } from "@/data/StatCard"
+import { StatData } from "@/data/StatCardStudent"
 import Link from "next/link"
 export default function StudentDashboard() {
     return (
