@@ -7,7 +7,7 @@ import UserMenu from "./UserMenu";
 const links = [
     { href: "/Teacher/dashboard", label: "Dashboard" },
     { href: "/Teacher/exams", label: "My exams" },
-    { href: "/Teacher/question-bank", label: "Question bank" },
+    { href: "/Teacher/questions", label: "Question bank" },
     { href: "/Teacher/students", label: "Students" },
 ];
 
