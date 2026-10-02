@@ -1,6 +1,8 @@
 "use client"
 import { useState } from "react";
 import FilterDropdown from "@/components/FilterDropdown";
+import { toast } from "sonner"
+
 const QuestionTypes = ["Multiple choice", "True or false", "Fill in the gap"];
 const subject = "Mathematics";
 
@@ -22,6 +24,16 @@ export default function CreateQuestionForm({ onQuestionCreated }) {
 
     function handleSubmit(e) {
         e.preventDefault();
+
+        if (options.some((option) => option.trim() === "")) {
+            toast.error("Some options are empty")
+            return
+        }
+
+        if (correctIndex === null) {
+            toast.error("Please pick the correct option")
+            return
+        }
 
         const newQuestion = {
             id: crypto.randomUUID,

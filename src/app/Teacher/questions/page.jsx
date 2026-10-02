@@ -19,7 +19,7 @@ export default function QuestionBank() {
                     <p className="mt-1 text-sm text-muted">2 of 2 questions</p>
                 </div>
 
-                <Link href={``} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer bg-primary text-white shadow hover:bg-primary/90 h-9 px-3 py-2">
+                <Link href={`/Teacher/questions/new`} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer bg-primary text-white shadow hover:bg-primary/90 h-9 px-3 py-2">
                     <Plus />
                     Add question
                 </Link>

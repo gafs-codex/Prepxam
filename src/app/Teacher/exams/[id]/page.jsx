@@ -91,17 +91,6 @@ export default function ExamOverview() {
                     : (<AddFromBank onAddSelected={addQuestionsToExam} />)
                 }
             </div>
-
-            {/* {examQuestions.length > 0 && (
-                <div className="mt-6 space-y-2">
-                    <h2 className="text-sm font-medium text-muted-foreground">Questions in this exam</h2>
-                    {examQuestions.map((q) => (
-                        <div key={q.id} className="rounded-lg border border-border bg-card p-3 text-sm">
-                            {q.text}
-                        </div>
-                    ))}
-                </div>
-            )} */}
         </main>
     )
 }
