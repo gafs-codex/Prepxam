@@ -1,6 +1,7 @@
 "use client"
 import { useState } from "react";
 import FilterDropdown from "@/components/FilterDropdown";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner"
 
 const QuestionTypes = ["Multiple choice", "True or false", "Fill in the gap"];
@@ -22,36 +23,51 @@ export default function CreateQuestionForm({ onQuestionCreated }) {
         })
     }
 
-    function handleSubmit(e) {
+    async function handleSubmit(e) {
         e.preventDefault();
 
+        if (questionText.trim() === "") {
+            toast.error("Question field cannot be empty");
+            return;
+        }
         if (options.some((option) => option.trim() === "")) {
-            toast.error("Some options are empty")
-            return
+            toast.error("Some options are empty");
+            return;
         }
-
         if (correctIndex === null) {
-            toast.error("Please pick the correct option")
-            return
+            toast.error("Please pick the correct option");
+            return;
         }
 
-        const newQuestion = {
-            id: crypto.randomUUID,
-            text: questionText,
-            type: questionType,
-            subject,
-            options,
-            correctIndex,
-            explanation
+        const { data, error } = await supabase
+            .from("questions")
+            .insert({
+                question_text: questionText,
+                question_type: questionType,
+                options: options,
+                correct_index: correctIndex,
+                explanation: explanation,
+                // subject_id, exam_type, created_by — add once you have those wired up
+            })
+            .select()
+            .single();
+
+        if (error) {
+            toast.error("Failed to save question");
+            console.error(error);
+            return;
         }
 
-        onQuestionCreated(newQuestion)
+        onQuestionCreated(data);
+        toast.success("Question added to the bank");
 
         setQuestionText("");
         setOptions(["", "", "", ""]);
         setCorrectIndex(null);
         setExplanation("");
     }
+
+
     return (
         <div className="mt-6">
             <div className="max-w-3xl">
