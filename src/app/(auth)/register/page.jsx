@@ -4,18 +4,40 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
+const SUBJECTS = [
+    "Mathematics", "English Language", "Physics", "Chemistry",
+    "Biology", "Economics", "Government", "Geography",
+    "Literature in English", "Agricultural Science", "Further Mathematics",
+    "Commerce", "Financial Accounting", "Christian Religious Studies",
+    "Islamic Religious Studies", "Civic Education", "Computer Studies", "History"
+];
+
 export default function Register() {
     const [fullName, setFullName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [role, setRole] = useState("student");
+    const [selectedSubjects, setSelectedSubjects] = useState([]);
+
+    function toggleSubject(subject) {
+        setSelectedSubjects((prev) =>
+            prev.includes(subject)
+                ? prev.filter((s) => s !== subject)
+                : [...prev, subject]
+        );
+    }
 
     async function handleRegister(e) {
         e.preventDefault();
 
         if (password !== confirmPassword) {
             toast.error("Passwords don't match");
+            return;
+        }
+
+        if (role === "teacher" && selectedSubjects.length === 0) {
+            toast.error("Please select at least one subject you teach");
             return;
         }
 
@@ -26,6 +48,7 @@ export default function Register() {
                 data: {
                     full_name: fullName,
                     role: role,
+                    subjects: role === "teacher" ? selectedSubjects : [],
                 },
             },
         });
@@ -157,6 +180,33 @@ export default function Register() {
                                     </label>
                                 </div>
                             </div>
+
+                            {role === "teacher" && (
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium leading-none">
+                                        Subjects you teach
+                                    </label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {SUBJECTS.map((subject) => {
+                                            const isSelected = selectedSubjects.includes(subject);
+                                            return (
+                                                <button
+                                                    key={subject}
+                                                    type="button"
+                                                    onClick={() => toggleSubject(subject)}
+                                                    className={
+                                                        isSelected
+                                                            ? "rounded-full border border-primary bg-primary px-4 py-2 text-sm font-medium text-white transition"
+                                                            : "rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-accent"
+                                                    }
+                                                >
+                                                    {subject}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"
                             >

@@ -46,7 +46,7 @@ export default function TeacherDashboardNavbar() {
                     <Bell className="h-5 w-5 text-muted" />
                 </button>
 
-                <UserMenu name="Ayomide gafar" role="Teacher Account" />
+                <UserMenu />
             </div>
         </nav>
     )

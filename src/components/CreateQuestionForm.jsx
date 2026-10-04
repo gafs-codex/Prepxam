@@ -38,7 +38,12 @@ export default function CreateQuestionForm({ onQuestionCreated }) {
             toast.error("Please pick the correct option");
             return;
         }
+        const { data: { user } } = await supabase.auth.getUser();
 
+        if (!user) {
+            toast.error("You must be logged in to create a question");
+            return;
+        }
         const { data, error } = await supabase
             .from("questions")
             .insert({
@@ -47,7 +52,7 @@ export default function CreateQuestionForm({ onQuestionCreated }) {
                 options: options,
                 correct_index: correctIndex,
                 explanation: explanation,
-                // subject_id, exam_type, created_by — add once you have those wired up
+                created_by: user.id,
             })
             .select()
             .single();
@@ -59,7 +64,6 @@ export default function CreateQuestionForm({ onQuestionCreated }) {
         }
 
         onQuestionCreated(data);
-        toast.success("Question added to the bank");
 
         setQuestionText("");
         setOptions(["", "", "", ""]);

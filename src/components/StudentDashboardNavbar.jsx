@@ -46,7 +46,7 @@ export default function StudentDashboardNavbar() {
                     <Bell className="h-5 w-5 text-muted" />
                 </button>
 
-                <UserMenu name="Abdulmuiz Abdulgafar" role="Student Account" />
+                <UserMenu />
             </div>
         </nav>
     )
