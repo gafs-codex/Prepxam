@@ -19,6 +19,7 @@ export default function Register() {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [role, setRole] = useState("student");
     const [selectedSubjects, setSelectedSubjects] = useState([]);
+    const [agreedToTerms, setAgreedToTerms] = useState(false);
 
     function toggleSubject(subject) {
         setSelectedSubjects((prev) =>
@@ -31,6 +32,20 @@ export default function Register() {
     async function handleRegister(e) {
         e.preventDefault();
 
+        if (fullName.trim() === "") {
+            toast.error("Please enter your full name")
+            return;
+        }
+
+        if (email.trim() === "") {
+            toast.error("Please enter your email ")
+            return
+        }
+        else if (!email.includes("@")) {
+            toast.error("enter a valid email please")
+            return
+        }
+
         if (password !== confirmPassword) {
             toast.error("Passwords don't match");
             return;
@@ -40,6 +55,12 @@ export default function Register() {
             toast.error("Please select at least one subject you teach");
             return;
         }
+
+        if (!agreedToTerms) {
+            toast.error("You must agree to the terms of use and privacy policy");
+            return;
+        }
+
 
         const { data, error } = await supabase.auth.signUp({
             email,
@@ -186,7 +207,7 @@ export default function Register() {
                                     <label className="text-sm font-medium leading-none">
                                         Subjects you teach
                                     </label>
-                                    <div className="flex flex-wrap gap-2">
+                                    <div className="flex flex-wrap gap-2 mt-2">
                                         {SUBJECTS.map((subject) => {
                                             const isSelected = selectedSubjects.includes(subject);
                                             return (
@@ -197,7 +218,7 @@ export default function Register() {
                                                     className={
                                                         isSelected
                                                             ? "rounded-full border border-primary bg-primary px-4 py-2 text-sm font-medium text-white transition"
-                                                            : "rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:bg-accent"
+                                                            : "rounded-full border border-border px-2.5 py-1 text-sm font-normal text-foreground transition hover:bg-accent"
                                                     }
                                                 >
                                                     {subject}
@@ -214,6 +235,8 @@ export default function Register() {
                                     type="checkbox"
                                     name="terms"
                                     id="terms"
+                                    checked={agreedToTerms}
+                                    onChange={(e) => setAgreedToTerms(e.target.value)}
                                     className="h-3.5 w-3.5 cursor-pointer rounded-full accent-blue-600 focus:ring-blue-500"
                                 />
                                 I agree to the terms of use and privacy policy.
