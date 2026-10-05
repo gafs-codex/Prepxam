@@ -1,40 +1,97 @@
 "use client"
 import Link from "next/link"
-import { useState } from "react";
-import { Library, CirclePlus, Search } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
+import { Library, CirclePlus } from 'lucide-react';
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 import CreateQuestionForm from "@/components/CreateQuestionForm";
 import AddFromBank from "@/components/AddFromBank";
 
-const TOTAL_NEEDED = 20; // from exam.numberOfQuestions later
-
 export default function ExamOverview() {
-    const [activePanel, setActivePanel] = useState("bank")
-    const [examQuestions, setExamQuestions] = useState([])
+
+    const { id } = useParams();
+    const [exam, setExam] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [activePanel, setActivePanel] = useState("bank");
+    const [examQuestions, setExamQuestions] = useState([]);
 
 
-    function addQuestionsToExam(newQuestions) {
-        setExamQuestions((prev) => {
-            const existingIds = new Set(prev.map((questions) => questions.id))
-            const deduped = newQuestions.filter((question) => !existingIds.has(question.id));
-            return [...prev, ...deduped];
-        })
+    useEffect(() => {
+        async function loadExam() {
+            const { data: examData, error } = await supabase
+                .from("exams")
+                .select("*")
+                .eq("id", id)
+                .single();
+
+            if (error) {
+                toast.error("Could not load exam");
+                console.error(error);
+                setLoading(false);
+                return;
+            }
+            setExam(examData);
+
+            const { data: links, error: linkError } = await supabase
+                .from("exam_questions")
+                .select("position, questions(*)")
+                .eq("exam_id", id)
+                .order("position");
+
+            if (linkError) {
+                toast.error("Could not load exam questions");
+                console.error(linkError);
+            } else {
+                setExamQuestions(links.map((l) => l.questions).filter(Boolean));
+            }
+            setLoading(false);
+        }
+        loadExam();
+    }, [id]);
+
+    async function addQuestionsToExam(newQuestions) {
+        const existingIds = new Set(examQuestions.map((q) => q.id));
+        const toAdd = newQuestions.filter((q) => !existingIds.has(q.id));
+        if (toAdd.length === 0) return;
+
+        const rows = toAdd.map((q, i) => ({
+            exam_id: id,
+            question_id: q.id,
+            position: examQuestions.length + i,
+        }));
+
+        const { error } = await supabase.from("exam_questions").insert(rows);
+        if (error) {
+            toast.error(`Could not add to exam: ${error.message}`);
+            console.error(error);
+            return;
+        }
+        setExamQuestions((prev) => [...prev, ...toAdd]);
+        toast.success(`${toAdd.length} question(s) added`);
     }
+
+    if (loading) return <main className="p-8">Loading...</main>;
+    if (!exam) return <main className="p-8">Exam not found.</main>;
+
+    const totalNeeded = exam.number_of_questions;
+
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
             <Link href={``}>
                 Exam overview
             </Link>
             <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Step 2 of 2 · Internal test · Mathematics
+                Step 2 of 2 · {exam.exam_type} · {exam.subject}
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-                Add questions to (name of exam)
+                Add questions to (exam.title)
             </h1>
 
             <div className="mt-4 rounded-xl border border-border bg-card p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-medium">
-                        {examQuestions.length} of {TOTAL_NEEDED} questions added
+                        {examQuestions.length} of {totalNeeded} questions added
                     </p>
 
                     <Link href={``} className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs active">
@@ -43,7 +100,7 @@ export default function ExamOverview() {
                 </div>
 
                 <div
-                    aria-valuemax={TOTAL_NEEDED}
+                    aria-valuemax={totalNeeded}
                     aria-valuenow={examQuestions.length}
                     aria-valuemin="0"
                     role="progressbar"
@@ -53,7 +110,7 @@ export default function ExamOverview() {
                 >
                     <div
                         className="h-full bg-primary transition-all"
-                        style={{ width: `${Math.min((examQuestions.length / TOTAL_NEEDED) * 100, 100)}%` }}
+                        style={{ width: `${Math.min((examQuestions.length / totalNeeded) * 100, 100)}%` }}
                     />
                 </div>
             </div>
@@ -68,7 +125,7 @@ export default function ExamOverview() {
                     <Library className="text-primary" />
                     <span>
                         <span className="block font-medium">Add from question bank</span>
-                        <span className="block text-xs text-muted">Pick existing Mathematics · Internal test questions</span>
+                        <span className="block text-xs text-muted">Pick existing {exam.subject} · {exam.exam_type} questions</span>
                     </span>
                 </button>
 
@@ -81,15 +138,27 @@ export default function ExamOverview() {
                     <CirclePlus className="text-primary" width={24} height={24} />
                     <span>
                         <span className="block font-medium">Create a new question</span>
-                        <span className="block text-xs text-muted">Pick existing Mathematics · Internal test questions</span>
+                        <span className="block text-xs text-muted">Pick existing {exam.subject} · {exam.exam_type} questions</span>
                     </span>
                 </button>
             </div>
 
             <div className="mt-6">
-                {activePanel === "create" ? (<CreateQuestionForm onQuestionCreated={(question) => addQuestionsToExam([question])} />)
-                    : (<AddFromBank onAddSelected={addQuestionsToExam} />)
-                }
+                {activePanel === "create" ? (
+                    <CreateQuestionForm
+                        lockedSubject={exam.subject}
+                        lockedExamType={exam.exam_type}
+                        onQuestionCreated={(question) => addQuestionsToExam([question])}
+                        onCancel={() => setActivePanel("bank")}
+                    />
+                ) : (
+                    <AddFromBank
+                        subject={exam.subject}
+                        examType={exam.exam_type}
+                        addedIds={examQuestions.map((q) => q.id)}
+                        onAddSelected={addQuestionsToExam}
+                    />
+                )}
             </div>
         </main>
     )

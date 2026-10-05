@@ -9,7 +9,8 @@ const ExamType = ["Internal test", "WAEC", "NECO", "JAMB", "GCE"]
 
 
 
-export default function CreateQuestionForm({ onQuestionCreated }) {
+export default function CreateQuestionForm({ onQuestionCreated, onCancel, lockedSubject, lockedExamType, submitLabel = "Save question", }) {
+
     const [subjects, setSubjects] = useState([]);
     const [subject, setSubject] = useState("");
     const [questionType, setQuestionType] = useState("Multiple choice");
@@ -21,17 +22,19 @@ export default function CreateQuestionForm({ onQuestionCreated }) {
 
 
     useEffect(() => {
+        if (lockedSubject) return;
+
         async function loadSubjects() {
             const { data: { user } } = await supabase.auth.getUser();
             const teacherSubjects = user?.user_metadata?.subjects ?? [];
 
             setSubjects(teacherSubjects);
             if (teacherSubjects.length > 0) {
-                setSubject(teacherSubjects[0]); // default to the first one
+                setSubject(teacherSubjects[0]);
             }
         }
         loadSubjects();
-    }, []);
+    }, [lockedSubject]);
 
     function updateOption(id, value) {
         setOptions((prev) => {
@@ -97,6 +100,9 @@ export default function CreateQuestionForm({ onQuestionCreated }) {
         setExplanation("");
     }
 
+    const lockedBoxClass =
+        "flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm text-muted cursor-not-allowed";
+
 
     return (
         <div className="mt-6">
@@ -119,33 +125,28 @@ export default function CreateQuestionForm({ onQuestionCreated }) {
 
                         <div className="space-y-2 flex flex-col gap-2">
                             <label className="text-sm font-medium leading-none">Subject</label>
-                            <FilterDropdown options={subjects} value={subject} onChange={setSubject} />
-                            {/* <div className="flex h-9 w-full items-center  rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm text-muted cursor-not-allowed">
-                                {subject}
-                            </div> */}
+                            {lockedSubject ? (
+                                <div className={lockedBoxClass}>{lockedSubject}</div>
+                            ) : (
+                                <FilterDropdown options={subjects} value={subject} onChange={setSubject} />
+                            )}
                         </div>
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">
                         {/* {} */}
                         <div className="space-y-2 flex flex-col gap-2">
-                            <label htmlFor="" className="text-sm font-medium leading-none">
-                                Exam type
-                            </label>
-                            {/* <div className="flex h-9 w-full items-center  rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm text-muted cursor-not-allowed">
-                                Internal test
-                            </div> */
-                            }
-                            <FilterDropdown options={ExamType} value={examType} onChange={setExamType} />
+                            <label className="text-sm font-medium leading-none">Exam type</label>
+                            {lockedExamType ? (
+                                <div className={lockedBoxClass}>{lockedExamType}</div>
+                            ) : (
+                                <FilterDropdown options={ExamTypes} value={examType} onChange={setExamType} />
+                            )}
                         </div>
 
                         <div className="space-y-2 flex flex-col gap-2">
-                            <label htmlFor="" className="text-sm font-medium leading-none">
-                                Topic
-                            </label>
-                            <div className="flex h-9 w-full items-center  rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm text-muted cursor-not-allowed">
-                                Internal test
-                            </div>
+                            <label className="text-sm font-medium leading-none">Topic</label>
+                            <div className={lockedBoxClass}>Internal test</div>
                         </div>
                     </div>
 
@@ -189,10 +190,13 @@ export default function CreateQuestionForm({ onQuestionCreated }) {
 
                         <div className="flex gap-3 items-center">
                             <button type="submit" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer bg-primary text-white shadow hover:bg-primary/90 h-9 px-4 py-2">
-                                Save and add to exam
+                                {submitLabel}
                             </button>
 
-                            <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
+                            <button
+                                type="button"
+                                onClick={onCancel}
+                                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
                                 Cancel
                             </button>
                         </div>
