@@ -236,7 +236,7 @@ export default function Register() {
                                     name="terms"
                                     id="terms"
                                     checked={agreedToTerms}
-                                    onChange={(e) => setAgreedToTerms(e.target.value)}
+                                    onChange={(e) => setAgreedToTerms(e.target.checked)}
                                     className="h-3.5 w-3.5 cursor-pointer rounded-full accent-blue-600 focus:ring-blue-500"
                                 />
                                 I agree to the terms of use and privacy policy.

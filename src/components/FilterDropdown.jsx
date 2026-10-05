@@ -13,7 +13,7 @@ export default function FilterDropdown({ options, value, onChange }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <button className="inline-flex h-9 items-center gap-2 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm cursor-pointer">
+                <button type="button" className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm cursor-pointer">
                     {value}
                     <ChevronDown className="h-4 w-4 text-muted" />
                 </button>

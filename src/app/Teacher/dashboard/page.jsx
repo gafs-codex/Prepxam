@@ -1,14 +1,25 @@
+"use client"
+import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { Plus } from 'lucide-react';
 import { StatDataTeacher } from "@/data/StatCardTeacher";
 import StatCard from "@/components/ui/StatCard";
 
 export default function TeacherDashboard() {
+    const { profile, loading } = useAuth();
+
+    if (loading) {
+        return <div className="p-8">Loading...</div>;
+    }
+
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-semibold tracking-tight">Hello, Ayomide</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight">
+                        Welcome back, {profile?.full_name?.split(" ")[0] || "user....."} 👋
+                    </h1>
+                    
                     <p className="mt-1 text-sm text-muted">Your teaching activity at a glance.</p>
                 </div>
 

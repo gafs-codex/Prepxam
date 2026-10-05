@@ -1,19 +1,37 @@
 "use client"
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import FilterDropdown from "@/components/FilterDropdown";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner"
 
 const QuestionTypes = ["Multiple choice", "True or false", "Fill in the gap"];
-const subject = "Mathematics";
+const ExamType = ["Internal test", "WAEC", "NECO", "JAMB", "GCE"]
+
 
 
 export default function CreateQuestionForm({ onQuestionCreated }) {
+    const [subjects, setSubjects] = useState([]);
+    const [subject, setSubject] = useState("");
     const [questionType, setQuestionType] = useState("Multiple choice");
     const [questionText, setQuestionText] = useState("");
+    const [examType, setExamType] = useState("Internal test")
     const [options, setOptions] = useState(["", "", "", ""]);
     const [correctIndex, setCorrectIndex] = useState(null);
     const [explanation, setExplanation] = useState("");
+
+
+    useEffect(() => {
+        async function loadSubjects() {
+            const { data: { user } } = await supabase.auth.getUser();
+            const teacherSubjects = user?.user_metadata?.subjects ?? [];
+
+            setSubjects(teacherSubjects);
+            if (teacherSubjects.length > 0) {
+                setSubject(teacherSubjects[0]); // default to the first one
+            }
+        }
+        loadSubjects();
+    }, []);
 
     function updateOption(id, value) {
         setOptions((prev) => {
@@ -30,6 +48,12 @@ export default function CreateQuestionForm({ onQuestionCreated }) {
             toast.error("Question field cannot be empty");
             return;
         }
+
+        if (!subject) {
+            toast.error("Please select a subject");
+            return;
+        }
+
         if (options.some((option) => option.trim() === "")) {
             toast.error("Some options are empty");
             return;
@@ -49,6 +73,8 @@ export default function CreateQuestionForm({ onQuestionCreated }) {
             .insert({
                 question_text: questionText,
                 question_type: questionType,
+                subject: subject,
+                exam_type: examType,
                 options: options,
                 correct_index: correctIndex,
                 explanation: explanation,
@@ -92,12 +118,11 @@ export default function CreateQuestionForm({ onQuestionCreated }) {
                         </div>
 
                         <div className="space-y-2 flex flex-col gap-2">
-                            <label htmlFor="" className="text-sm font-medium leading-none">
-                                Subject
-                            </label>
-                            <div className="flex h-9 w-full items-center  rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm text-muted cursor-not-allowed">
+                            <label className="text-sm font-medium leading-none">Subject</label>
+                            <FilterDropdown options={subjects} value={subject} onChange={setSubject} />
+                            {/* <div className="flex h-9 w-full items-center  rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm text-muted cursor-not-allowed">
                                 {subject}
-                            </div>
+                            </div> */}
                         </div>
                     </div>
 
@@ -107,9 +132,11 @@ export default function CreateQuestionForm({ onQuestionCreated }) {
                             <label htmlFor="" className="text-sm font-medium leading-none">
                                 Exam type
                             </label>
-                            <div className="flex h-9 w-full items-center  rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm text-muted cursor-not-allowed">
+                            {/* <div className="flex h-9 w-full items-center  rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm text-muted cursor-not-allowed">
                                 Internal test
-                            </div>
+                            </div> */
+                            }
+                            <FilterDropdown options={ExamType} value={examType} onChange={setExamType} />
                         </div>
 
                         <div className="space-y-2 flex flex-col gap-2">
