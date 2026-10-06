@@ -85,7 +85,7 @@ export default function ExamOverview() {
                 Step 2 of 2 · {exam.exam_type} · {exam.subject}
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-                Add questions to (exam.title)
+                Add questions to {exam.title}
             </h1>
 
             <div className="mt-4 rounded-xl border border-border bg-card p-4">
@@ -94,7 +94,7 @@ export default function ExamOverview() {
                         {examQuestions.length} of {totalNeeded} questions added
                     </p>
 
-                    <Link href={``} className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs active">
+                    <Link href={`/Teacher/exams/${id}/review`} className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs active cursor-pointer">
                         Done — review exam
                     </Link>
                 </div>
@@ -144,21 +144,24 @@ export default function ExamOverview() {
             </div>
 
             <div className="mt-6">
-                {activePanel === "create" ? (
+                <div className={activePanel === "create" ? "" : "hidden"}>
                     <CreateQuestionForm
                         lockedSubject={exam.subject}
                         lockedExamType={exam.exam_type}
+                        submitLabel="Save and add to exam"
                         onQuestionCreated={(question) => addQuestionsToExam([question])}
                         onCancel={() => setActivePanel("bank")}
                     />
-                ) : (
+                </div>
+
+                <div className={activePanel === "bank" ? "" : "hidden"}>
                     <AddFromBank
                         subject={exam.subject}
                         examType={exam.exam_type}
                         addedIds={examQuestions.map((q) => q.id)}
                         onAddSelected={addQuestionsToExam}
                     />
-                )}
+                </div>
             </div>
         </main>
     )

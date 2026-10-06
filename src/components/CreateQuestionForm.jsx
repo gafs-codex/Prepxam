@@ -5,21 +5,34 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner"
 
 const QuestionTypes = ["Multiple choice", "True or false", "Fill in the gap"];
-const ExamType = ["Internal test", "WAEC", "NECO", "JAMB", "GCE"]
-
-
+const ExamTypes = ["Internal test", "WAEC", "NECO", "JAMB", "GCE"]
 
 export default function CreateQuestionForm({ onQuestionCreated, onCancel, lockedSubject, lockedExamType, submitLabel = "Save question", }) {
 
     const [subjects, setSubjects] = useState([]);
-    const [subject, setSubject] = useState("");
+    const [subjectState, setSubjectState] = useState("");
+    const [examTypeState, setExamTypeState] = useState("Internal test");
     const [questionType, setQuestionType] = useState("Multiple choice");
     const [questionText, setQuestionText] = useState("");
-    const [examType, setExamType] = useState("Internal test")
     const [options, setOptions] = useState(["", "", "", ""]);
     const [correctIndex, setCorrectIndex] = useState(null);
     const [explanation, setExplanation] = useState("");
 
+    const subject = lockedSubject ?? subjectState;
+    const examType = lockedExamType ?? examTypeState;
+
+    const isTrueFalse = questionType === "True or false";
+    const isFillGap = questionType === "Fill in the gap";
+
+    function handleQuestionTypeChange(type) {
+        const goingToTF = type === "True or false";
+        // only reset the options when switching to or from True/False
+        if (goingToTF !== isTrueFalse) {
+            setOptions(goingToTF ? ["True", "False"] : ["", "", "", ""]);
+            setCorrectIndex(null);
+        }
+        setQuestionType(type);
+    }
 
     useEffect(() => {
         if (lockedSubject) return;
@@ -30,7 +43,7 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
 
             setSubjects(teacherSubjects);
             if (teacherSubjects.length > 0) {
-                setSubject(teacherSubjects[0]);
+                setSubjectState(teacherSubjects[0]);
             }
         }
         loadSubjects();
@@ -87,7 +100,7 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
             .single();
 
         if (error) {
-            toast.error("Failed to save question");
+            toast.error(`Failed to save question: ${error.message}`);
             console.error(error);
             return;
         }
@@ -95,14 +108,13 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
         onQuestionCreated(data);
 
         setQuestionText("");
-        setOptions(["", "", "", ""]);
+        setOptions(isTrueFalse ? ["True", "False"] : ["", "", "", ""]);
         setCorrectIndex(null);
         setExplanation("");
     }
 
     const lockedBoxClass =
         "flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm text-muted cursor-not-allowed";
-
 
     return (
         <div className="mt-6">
@@ -119,8 +131,8 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
 
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2 flex flex-col gap-2">
-                            <label htmlFor="" className="text-sm font-medium leading-none">Question type</label>
-                            <FilterDropdown options={QuestionTypes} value={questionType} onChange={setQuestionType} />
+                            <label className="text-sm font-medium leading-none">Question type</label>
+                            <FilterDropdown options={QuestionTypes} value={questionType} onChange={handleQuestionTypeChange} />
                         </div>
 
                         <div className="space-y-2 flex flex-col gap-2">
@@ -128,19 +140,18 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
                             {lockedSubject ? (
                                 <div className={lockedBoxClass}>{lockedSubject}</div>
                             ) : (
-                                <FilterDropdown options={subjects} value={subject} onChange={setSubject} />
+                                <FilterDropdown options={subjects} value={subject} onChange={setSubjectState} />
                             )}
                         </div>
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">
-                        {/* {} */}
                         <div className="space-y-2 flex flex-col gap-2">
                             <label className="text-sm font-medium leading-none">Exam type</label>
                             {lockedExamType ? (
                                 <div className={lockedBoxClass}>{lockedExamType}</div>
                             ) : (
-                                <FilterDropdown options={ExamTypes} value={examType} onChange={setExamType} />
+                                <FilterDropdown options={ExamTypes} value={examType} onChange={setExamTypeState} />
                             )}
                         </div>
 
@@ -151,33 +162,46 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
                     </div>
 
                     <div className="space-y-3">
-                        <label htmlFor="" className="text-sm font-medium leading-none">
+                        <label className="text-sm font-medium leading-none">
                             Answer options — select the correct one
                         </label>
 
+                        {isFillGap && (
+                            <p className="text-sm text-muted">
+                                Write the sentence with a gap, e.g. "The SI unit of force is ____." Then give the options below.
+                            </p>
+                        )}
+
                         <div role="radiogroup" className="grid gap-2 space-y-2 mt-2.5">
-                            {options.map((option, index) => {
-                                return <div key={index} className="flex items-center gap-3">
+                            {options.map((option, index) => (
+                                <div key={index} className="flex items-center gap-3">
                                     <input
                                         type="radio"
                                         name="correctOption"
+                                        id={`option-${index}`}
                                         checked={correctIndex === index}
                                         onChange={() => setCorrectIndex(index)}
                                         className="cursor-pointer accent-blue-600 focus:ring-blue-500 h-5 w-5"
                                     />
-                                    <input
-                                        type="text"
-                                        value={option}
-                                        onChange={(e) => updateOption(index, e.target.value)}
-                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm md:text-sm outline-none"
-                                        placeholder={`Option ${String.fromCharCode(65 + index)}`}
-                                    />
+                                    {isTrueFalse ? (
+                                        <label htmlFor={`option-${index}`} className="cursor-pointer text-sm">
+                                            {option}
+                                        </label>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            value={option}
+                                            onChange={(e) => updateOption(index, e.target.value)}
+                                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm md:text-sm outline-none"
+                                            placeholder={`Option ${String.fromCharCode(65 + index)}`}
+                                        />
+                                    )}
                                 </div>
-                            })}
+                            ))}
                         </div>
 
                         <div className="space-y-2">
-                            <label htmlFor="" className="text-sm font-medium leading-none">
+                            <label className="text-sm font-medium leading-none">
                                 Explanation (shown after the exam)
                             </label>
 
@@ -204,6 +228,5 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
                 </form>
             </div>
         </div>
-
     )
 }
