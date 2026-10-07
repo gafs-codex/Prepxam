@@ -25,7 +25,18 @@ export default function Login() {
             return;
         }
 
-        // Fetch their profile to know which dashboard to send them to
+        const { data: adminRow } = await supabase
+            .from("admins")
+            .select("role")
+            .eq("user_id", data.user.id)
+            .maybeSingle();
+
+        if (adminRow) {
+            toast.success("Logged in!");
+            router.push("/Admin/dashboard");
+            return;
+        }
+
         const { data: profile, error: profileError } = await supabase
             .from("profiles")
             .select("role")
