@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { PageLoader } from "@/components/ui/Spinner"
 import Link from "next/link";
 
 export default function EditQuestion() {
@@ -68,9 +69,7 @@ export default function EditQuestion() {
         router.push("/Teacher/questions");
     }
 
-    if (loading) {
-        return <div className="p-8">Loading...</div>;
-    }
+   if (loading) return <PageLoader />
 
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { Library, CirclePlus } from 'lucide-react';
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { PageLoader } from "@/components/ui/Spinner"
 import CreateQuestionForm from "@/components/CreateQuestionForm";
 import AddFromBank from "@/components/AddFromBank";
 
@@ -71,7 +72,7 @@ export default function ExamOverview() {
         toast.success(`${toAdd.length} question(s) added`);
     }
 
-    if (loading) return <main className="p-8">Loading...</main>;
+    if (loading) return <PageLoader />;
     if (!exam) return <main className="p-8">Exam not found.</main>;
 
     const totalNeeded = exam.number_of_questions;

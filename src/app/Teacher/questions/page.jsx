@@ -4,6 +4,7 @@ import { Plus, Search, Pencil, Trash2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import FilterDropdown from "@/components/FilterDropdown"
 import { supabase } from "@/lib/supabase"
+import { PageLoader } from "@/components/ui/Spinner"
 import { toast } from "sonner"
 import {
     AlertDialog,
@@ -103,7 +104,7 @@ export default function QuestionBank() {
 
             <div className="mt-6 space-y-3">
                 {loading ? (
-                    <p className="text-sm text-muted">Loading questions...</p>
+                    <PageLoader />
                 ) : filteredQuestions.length === 0 ? (
                     <p className="text-sm text-muted">No questions yet — create your first one.</p>
                 ) : (

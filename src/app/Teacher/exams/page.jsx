@@ -14,6 +14,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { supabase } from "@/lib/supabase";
+import { PageLoader } from "@/components/ui/Spinner"
 
 const STATUS_STYLES = {
     draft: { label: "Draft", className: "bg-accent" },
@@ -180,7 +181,7 @@ export default function TeacherExam() {
 
             <div className="mt-6 space-y-3">
                 {loading ? (
-                    <p className="text-sm text-muted">Loading exams...</p>
+                    <PageLoader />
                 ) : visibleExams.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted bg-white">
                         {exams.length === 0 ? "No exams yet." : "No exams match your search."}

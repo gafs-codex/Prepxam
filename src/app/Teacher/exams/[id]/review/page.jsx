@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import { ArrowUp, ArrowDown, Pencil, X, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
+import { PageLoader } from "@/components/ui/Spinner"
 
 export default function ReviewExam() {
     const { id } = useParams();
@@ -74,7 +75,7 @@ export default function ReviewExam() {
         toast.success("Removed from exam");
     }
 
-    if (loading) return <main className="p-8">Loading...</main>;
+    if (loading) return <PageLoader />;
     if (!exam) return <main className="p-8">Exam not found.</main>;
 
     const iconBtn = "inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer";

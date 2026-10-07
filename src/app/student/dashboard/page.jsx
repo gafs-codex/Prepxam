@@ -2,14 +2,13 @@
 import { useAuth } from "@/context/AuthContext";
 import StatCard from "@/components/ui/StatCard"
 import { StatData } from "@/data/StatCardStudent"
+import { PageLoader } from "@/components/ui/Spinner"
 import Link from "next/link"
 
 export default function StudentDashboard() {
     const { profile, loading } = useAuth();
 
-    if (loading) {
-        return <div className="p-8">Loading...</div>;
-    }
+    if (loading) return <PageLoader />;
 
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
