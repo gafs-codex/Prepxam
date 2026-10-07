@@ -3,6 +3,16 @@ import { useState, useEffect } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { supabase } from "@/lib/supabase";
 
 const STATUS_STYLES = {
@@ -16,7 +26,9 @@ export default function TeacherExam() {
     const [exams, setExams] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
-    const [publishingId, setPublishingId] = useState(null);
+    const [busyId, setBusyId] = useState(null);
+    // which dialog is open: { type: "publish" | "withdraw" | "delete", exam }
+    const [dialog, setDialog] = useState(null);
 
     useEffect(() => {
         async function loadExams() {
@@ -36,52 +48,111 @@ export default function TeacherExam() {
         loadExams();
     }, []);
 
-    async function publishExam(exam, added) {
+    function updateLocal(id, changes) {
+        setExams((prev) => prev.map((e) => (e.id === id ? { ...e, ...changes } : e)));
+    }
+
+    // Check first, then open the dialog only if publishing is possible
+    function requestPublish(exam, added) {
         if (added < exam.number_of_questions) {
             toast.error(`Add at least ${exam.number_of_questions} questions before publishing (you have ${added}). Use Review to add more.`);
             return;
         }
+        setDialog({ type: "publish", exam });
+    }
 
-        if (!window.confirm("Send this exam to the admin for approval? You won't be able to edit it while it's under review.")) return;
-
-        setPublishingId(exam.id);
-
+    async function publishExam(exam) {
+        setBusyId(exam.id);
         const { data, error } = await supabase
             .from("exams")
             .update({ status: "pending", submitted_at: new Date().toISOString(), review_note: null })
             .eq("id", exam.id)
             .select()
             .single();
-
-        setPublishingId(null);
+        setBusyId(null);
 
         if (error) {
             toast.error(`Could not publish: ${error.message}`);
             console.error(error);
             return;
         }
-
-        setExams((prev) => prev.map((e) => (e.id === exam.id ? { ...e, ...data } : e)));
+        updateLocal(exam.id, data);
         toast.success("Sent for approval");
     }
 
-    async function deleteExam(id) {
-        if (!window.confirm("Delete this exam? The questions stay in your question bank.")) return;
+    async function withdrawExam(exam) {
+        setBusyId(exam.id);
+        const { data, error } = await supabase
+            .from("exams")
+            .update({ status: "draft" })
+            .eq("id", exam.id)
+            .select()
+            .single();
+        setBusyId(null);
 
-        const { error } = await supabase.from("exams").delete().eq("id", id);
+        if (error) {
+            toast.error(`Could not withdraw: ${error.message}`);
+            console.error(error);
+            return;
+        }
+        updateLocal(exam.id, data);
+        toast.success("Exam withdrawn. It's a draft again.");
+    }
+
+    async function deleteExam(exam) {
+        setBusyId(exam.id);
+        const { data, error } = await supabase
+            .from("exams")
+            .delete()
+            .eq("id", exam.id)
+            .select();
+        setBusyId(null);
+
         if (error) {
             toast.error(`Could not delete: ${error.message}`);
             return;
         }
-        setExams((prev) => prev.filter((exam) => exam.id !== id));
+        // RLS can block a delete without raising an error, so check a row really went
+        if (!data || data.length === 0) {
+            toast.error("This exam can't be deleted right now.");
+            return;
+        }
+        setExams((prev) => prev.filter((e) => e.id !== exam.id));
         toast.success("Exam deleted");
     }
+
+    function confirmDialog() {
+        if (!dialog) return;
+        const { type, exam } = dialog;
+        if (type === "publish") publishExam(exam);
+        if (type === "withdraw") withdrawExam(exam);
+        if (type === "delete") deleteExam(exam);
+    }
+
+    const DIALOG_TEXT = {
+        publish: {
+            title: "Send this exam for approval?",
+            description: "The admin will review it. While it is under review you can't edit it or its questions, but you can withdraw it back to draft any time before it is approved.",
+            action: "Send for approval",
+        },
+        withdraw: {
+            title: "Withdraw this exam?",
+            description: "It goes back to draft and leaves the admin's pending list. You can edit it and send it again later.",
+            action: "Withdraw",
+        },
+        delete: {
+            title: "Delete this exam?",
+            description: "The exam will be removed. Its questions stay in your question bank. This cannot be undone.",
+            action: "Delete",
+        },
+    };
+    const text = dialog ? DIALOG_TEXT[dialog.type] : null;
 
     const visibleExams = exams.filter((exam) =>
         exam.title.toLowerCase().includes(search.toLowerCase())
     );
 
-    const outlineBtn = "inline-flex items-center justify-center rounded-md border border-input bg-background shadow-sm hover:bg-accent h-9 px-3 text-sm font-medium";
+    const outlineBtn = "inline-flex items-center justify-center rounded-md border border-input bg-background shadow-sm hover:bg-accent h-9 px-3 text-sm font-medium cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed";
 
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -119,7 +190,9 @@ export default function TeacherExam() {
                         const added = exam.exam_questions?.[0]?.count ?? 0;
                         const status = STATUS_STYLES[exam.status] ?? STATUS_STYLES.draft;
                         const canPublish = exam.status === "draft" || exam.status === "rejected";
+                        const canWithdraw = exam.status === "pending";
                         const locked = exam.status === "pending" || exam.status === "approved";
+                        const busy = busyId === exam.id;
 
                         return (
                             <div
@@ -150,13 +223,22 @@ export default function TeacherExam() {
                                     {canPublish && (
                                         <button
                                             type="button"
-                                            onClick={() => publishExam(exam, added)}
-                                            disabled={publishingId === exam.id}
-                                            className={`${outlineBtn} cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed`}
+                                            onClick={() => requestPublish(exam, added)}
+                                            disabled={busy}
+                                            className={outlineBtn}
                                         >
-                                            {publishingId === exam.id
-                                                ? "Sending..."
-                                                : exam.status === "rejected" ? "Resubmit" : "Publish"}
+                                            {busy ? "Sending..." : exam.status === "rejected" ? "Resubmit" : "Publish"}
+                                        </button>
+                                    )}
+
+                                    {canWithdraw && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setDialog({ type: "withdraw", exam })}
+                                            disabled={busy}
+                                            className={outlineBtn}
+                                        >
+                                            {busy ? "Withdrawing..." : "Withdraw"}
                                         </button>
                                     )}
 
@@ -164,19 +246,50 @@ export default function TeacherExam() {
                                         {locked ? "View" : "Review"}
                                     </Link>
 
-                                    <button
-                                        type="button"
-                                        onClick={() => deleteExam(exam.id)}
-                                        className={`${outlineBtn} cursor-pointer`}
-                                    >
-                                        <Trash2 className="h-4 w-4" color="red" />
-                                    </button>
+                                    {/* Delete is only offered while the exam is still yours to change */}
+                                    {!locked && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setDialog({ type: "delete", exam })}
+                                            disabled={busy}
+                                            className="inline-flex items-center justify-center rounded-md border border-input bg-background shadow-sm hover:bg-accent h-9 w-9 cursor-pointer disabled:opacity-60"
+                                        >
+                                            <Trash2 className="h-4 w-4" color="red" />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         );
                     })
                 )}
             </div>
+
+            {/* One dialog for all three actions */}
+            <AlertDialog
+                open={dialog !== null}
+                onOpenChange={(open) => { if (!open) setDialog(null); }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{text?.title}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {dialog && <span className="font-medium block">{dialog.exam.title}. </span>}
+                            {text?.description}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    {/* <AlertDialogFooter> */}
+                    <div className="flex justify-end gap-2 mt-2">
+                        <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDialog}
+                            className={`cursor-pointer text-white ${dialog?.type === "delete" ? "bg-red-600 hover:bg-red-700" : ""}`}
+                        >
+                            {text?.action}
+                        </AlertDialogAction>
+                    </div>
+                    {/* </AlertDialogFooter> */}
+                </AlertDialogContent>
+            </AlertDialog>
         </main>
     )
 }
