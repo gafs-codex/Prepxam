@@ -78,7 +78,7 @@ export default function AdminExamDetail() {
 
     return (
         <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-            <Link href="/Admin/exams" className="text-sm text-muted">← All exams</Link>
+            <Link href="/Admin/exam" className="text-sm text-muted">← All exams</Link>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">{exam.title}</h1>
             <p className="mt-1 text-sm text-muted">
                 {teacher} · {exam.subject} · {exam.exam_type} · {exam.duration_minutes} min · status: <span className="font-medium capitalize">{exam.status}</span>

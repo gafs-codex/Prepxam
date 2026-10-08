@@ -189,7 +189,7 @@ export default function AdminExams() {
                                                 <button type="button" onClick={() => startEdit(exam)} className={outlineBtn}>
                                                     Edit title / time
                                                 </button>
-                                                <Link href={`/Admin/exams/${exam.id}`} className={outlineBtn}>
+                                                <Link href={`/Admin/exam/${exam.id}`} className={outlineBtn}>
                                                     Review
                                                 </Link>
                                             </>
