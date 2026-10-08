@@ -3,6 +3,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
+import AdminDashboardNavbar from "@/components/AdminDashboardNavbar"
 
 export default function AdminLayout({ children }) {
     const router = useRouter();
@@ -36,11 +37,7 @@ export default function AdminLayout({ children }) {
 
     return (
         <div>
-            <nav className="flex gap-6 border-b border-border px-6 py-4 text-sm font-medium">
-                <Link href="/Admin/dashboard">Dashboard</Link>
-                <Link href="/Admin/users">Users</Link>
-                <Link href="/Admin/exam">Exams</Link>
-            </nav>  
+            <AdminDashboardNavbar />
             {children}
         </div>
     )

@@ -111,7 +111,7 @@ export default function AdminExams() {
                             key={f}
                             type="button"
                             onClick={() => setFilter(f)}
-                            className={`rounded-full border px-3 py-1 text-sm capitalize cursor-pointer ${filter === f ? "border-primary bg-primary text-white" : "border-border hover:bg-accent"}`}
+                            className={`inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer shadow h-8 rounded-md px-3 text-xs capitalize ${filter === f ? "border-primary bg-primary text-white" : "border-border hover:bg-accent"}`}
                         >
                             {f}
                         </button>
