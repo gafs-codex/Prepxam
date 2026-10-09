@@ -327,12 +327,14 @@ export default function TakeExam() {
                             You can't change your answers after submitting.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
+                    {/* <AlertDialogFooter> */}
+                    <div className="flex justify-end gap-2">
                         <AlertDialogCancel className="cursor-pointer">Keep working</AlertDialogCancel>
                         <AlertDialogAction onClick={() => submit(false)} className="cursor-pointer text-white">
                             Submit now
                         </AlertDialogAction>
-                    </AlertDialogFooter>
+                    </div>
+                    {/* </AlertDialogFooter> */}
                 </AlertDialogContent>
             </AlertDialog>
         </div>
