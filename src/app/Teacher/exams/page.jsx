@@ -126,6 +126,7 @@ export default function TeacherExam() {
     function confirmDialog() {
         if (!dialog) return;
         const { type, exam } = dialog;
+        setDialog(null);               // close first
         if (type === "publish") publishExam(exam);
         if (type === "withdraw") withdrawExam(exam);
         if (type === "delete") deleteExam(exam);

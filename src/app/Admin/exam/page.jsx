@@ -186,11 +186,13 @@ export default function AdminExams() {
                                             </>
                                         ) : (
                                             <>
-                                                <button type="button" onClick={() => startEdit(exam)} className={outlineBtn}>
-                                                    Edit title / time
-                                                </button>
-                                                <Link href={`/Admin/exam/${exam.id}`} className={outlineBtn}>
-                                                    Review
+                                                {exam.status !== "approved" && (
+                                                    <button type="button" onClick={() => startEdit(exam)} className={outlineBtn}>
+                                                        Edit title / time
+                                                    </button>
+                                                )}
+                                                <Link href={`/Admin/exams/${exam.id}`} className={outlineBtn}>
+                                                    {exam.status === "approved" ? "View" : "Review"}
                                                 </Link>
                                             </>
                                         )}

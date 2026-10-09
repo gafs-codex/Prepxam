@@ -116,36 +116,38 @@ export default function AdminExamDetail() {
                 ))}
             </div>
 
-            <div className="mt-8 rounded-xl border border-border bg-card p-5">
-                <h2 className="font-medium">Decision</h2>
-                <label className="mt-3 block text-sm text-muted">
-                    Note to the teacher (required when rejecting)
-                </label>
-                <textarea
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    className="mt-1 flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none"
-                    placeholder="e.g. Question 4 has two correct answers"
-                />
-                <div className="mt-4 flex gap-3">
-                    <button
-                        type="button"
-                        disabled={saving || exam.status === "approved"}
-                        onClick={() => decide("approved")}
-                        className="inline-flex h-9 items-center rounded-md bg-green-600 px-4 text-sm font-medium text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        Approve
-                    </button>
-                    <button
-                        type="button"
-                        disabled={saving || exam.status === "rejected"}
-                        onClick={() => decide("rejected")}
-                        className="inline-flex h-9 items-center rounded-md border border-red-300 px-4 text-sm font-medium text-red-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        Reject
-                    </button>
+            {exam.status !== "approved" && (
+                <div className="mt-8 rounded-xl border border-border bg-card p-5">
+                    <h2 className="font-medium">Decision</h2>
+                    <label className="mt-3 block text-sm text-muted">
+                        Note to the teacher (required when rejecting)
+                    </label>
+                    <textarea
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        className="mt-1 flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none"
+                        placeholder="e.g. Question 4 has two correct answers"
+                    />
+                    <div className="mt-4 flex gap-3">
+                        <button
+                            type="button"
+                            disabled={saving || exam.status === "approved"}
+                            onClick={() => decide("approved")}
+                            className="inline-flex h-9 items-center rounded-md bg-green-600 px-4 text-sm font-medium text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Approve
+                        </button>
+                        <button
+                            type="button"
+                            disabled={saving || exam.status === "rejected"}
+                            onClick={() => decide("rejected")}
+                            className="inline-flex h-9 items-center rounded-md border border-red-300 px-4 text-sm font-medium text-red-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Reject
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {exam.status === "approved" && <ResultsPanel exam={exam} onChange={setExam} />}
         </main>
