@@ -86,10 +86,10 @@ export default function HistoryPage() {
                                         </td>
                                         <td className="p-4">{duration(a)}</td>
                                         <td className="p-4 text-right">
-                                            {inProgress && (
-                                                <Link href={`/student/exams/${a.exam_id}`} className="font-medium text-primary hover:underline">
-                                                    Resume
-                                                </Link>
+                                            {inProgress ? (
+                                                <Link href={`/student/exams/${a.exam_id}`} className="font-medium text-primary hover:underline">Resume</Link>
+                                            ) : (
+                                                <Link href={`/student/history/${a.attempt_id}`} className="font-medium text-primary hover:underline">View results</Link>
                                             )}
                                         </td>
                                     </tr>

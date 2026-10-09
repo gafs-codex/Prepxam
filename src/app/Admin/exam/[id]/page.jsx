@@ -5,6 +5,8 @@ import { useParams } from "next/navigation"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { findExamProblems } from "@/lib/examChecks"
+import ResultsPanel from "@/components/ResultsPanel"
+import { PageLoader } from "@/components/ui/Spinner"
 
 export default function AdminExamDetail() {
     const { id } = useParams();
@@ -71,7 +73,7 @@ export default function AdminExamDetail() {
         toast.success(newStatus === "approved" ? "Exam approved" : "Exam rejected");
     }
 
-    if (loading) return <main className="p-8">Loading...</main>;
+    if (loading) return <PageLoader />;
     if (!exam) return <main className="p-8">Exam not found.</main>;
 
     const problems = findExamProblems(exam, questions);
@@ -144,6 +146,8 @@ export default function AdminExamDetail() {
                     </button>
                 </div>
             </div>
+
+            {exam.status === "approved" && <ResultsPanel exam={exam} onChange={setExam} />}
         </main>
     )
 }

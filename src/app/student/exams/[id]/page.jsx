@@ -52,7 +52,7 @@ export default function TakeExam() {
             const existing = (mine ?? []).find((a) => a.exam_id === id);
 
             if (existing?.submitted_at) {
-                router.replace("/student/history");
+                router.replace(`/student/history/${attempt.attempt_id}`);
                 return;
             }
             if (existing) await openAttempt(existing.attempt_id);
@@ -67,7 +67,7 @@ export default function TakeExam() {
         if (error) { toast.error(error.message); setPhase("missing"); return; }
 
         if (data.submitted) {
-            router.replace("/student/history");
+            router.replace(`/student/history/${attempt.attempt_id}`);
             return;
         }
 
@@ -126,7 +126,7 @@ export default function TakeExam() {
             return;
         }
         toast.success(auto ? "Time is up. Your exam was submitted." : "Exam submitted");
-        router.replace("/student/history");
+        router.replace(`/student/history/${attempt.attempt_id}`);
     }
 
     // countdown, based on the server's deadline
@@ -189,9 +189,11 @@ export default function TakeExam() {
     const flaggedCount = questions.filter((q) => flags[q.id]).length;
     const lowTime = secondsLeft !== null && secondsLeft <= 60;
 
+    const dense = total > 30;
+
     function gridClass(q, i) {
-        const base = "h-10 rounded-md border text-sm font-medium cursor-pointer";
-        const ring = i === current ? " ring-2 ring-primary ring-offset-2" : "";
+        const base = `rounded-md border font-medium cursor-pointer ${dense ? "h-8 text-xs" : "h-10 text-sm"}`;
+        const ring = i === current ? " ring-2 ring-primary" : "";
         if (flags[q.id]) return `${base} border-yellow-400 bg-yellow-400 text-yellow-950${ring}`;
         if (answers[q.id] !== undefined) return `${base} border-primary bg-primary text-white${ring}`;
         return `${base} border-border bg-accent/40${ring}`;
@@ -277,7 +279,7 @@ export default function TakeExam() {
                     <h2 className="font-semibold">Question grid</h2>
                     <p className="mt-1 text-sm text-muted">{answeredCount} answered · {unanswered} left</p>
 
-                    <div className="mt-4 grid grid-cols-5 gap-2">
+                    <div className={`mt-4 grid max-h-[50vh] overflow-y-auto p-1 ${dense ? "grid-cols-8 gap-1.5" : "grid-cols-5 gap-2"}`}>
                         {questions.map((q, i) => (
                             <button key={q.id} type="button" onClick={() => setCurrent(i)} className={gridClass(q, i)}>
                                 {i + 1}

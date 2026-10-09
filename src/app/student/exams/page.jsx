@@ -72,6 +72,10 @@ export default function BrowseExams() {
                             >
                                 {started.has(exam.id) ? "Resume exam" : "Start exam"}
                             </Link>
+
+                            <Link href="/student/dashboard" className="mt-3 block text-center text-sm text-muted hover:underline">
+                                Back to dashboard
+                            </Link>
                         </div>
                     ))
                 )}

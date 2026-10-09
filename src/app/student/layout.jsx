@@ -1,12 +1,13 @@
 "use client"
 import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import StudentDashboardNavbar from "@/components/StudentDashboardNavbar";
 
 export default function StudentDashboardLayout({ children }) {
     const { profile, loading } = useAuth();
     const router = useRouter();
+    const pathname = usePathname();
 
     useEffect(() => {
         if (!loading) {
@@ -22,10 +23,11 @@ export default function StudentDashboardLayout({ children }) {
         return <div className="p-8">Loading...</div>;
     }
 
+    const takingExam = /^\/student\/exams\/[^/]+$/.test(pathname);
 
     return (
         <div className="min-h-screen bg-background">
-            <StudentDashboardNavbar />
+            {!takingExam && <StudentDashboardNavbar />}
             <main className="mx-auto max-w-6xl px-4 py-6">
                 {children}
             </main>
