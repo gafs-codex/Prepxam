@@ -39,6 +39,10 @@ export default function BrowseExams() {
 
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+            <Link href={`/student/dashboard`} className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs active cursor-pointer mb-6">
+                Back to dashboard
+            </Link>
+
             <h1 className="text-2xl font-semibold tracking-tight">Browse exams</h1>
             <p className="mt-1 text-sm text-muted">{exams.length} available to take.</p>
 
@@ -73,9 +77,7 @@ export default function BrowseExams() {
                                 {started.has(exam.id) ? "Resume exam" : "Start exam"}
                             </Link>
 
-                            <Link href="/student/dashboard" className="mt-3 block text-center text-sm text-muted hover:underline">
-                                Back to dashboard
-                            </Link>
+
                         </div>
                     ))
                 )}
