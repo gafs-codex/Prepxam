@@ -45,9 +45,12 @@ export default function ReviewExam() {
                     .update({ position: i })
                     .eq("exam_id", id)
                     .eq("question_id", q.id)
+                    .select()
             )
         );
-        if (results.some((r) => r.error)) toast.error("Could not save the new order");
+        if (results.some((r) => r.error || !r.data || r.data.length === 0)) {
+            toast.error("Could not save the new order. The exam may be locked.");
+        }
     }
 
     function move(index, direction) {
@@ -60,13 +63,16 @@ export default function ReviewExam() {
     }
 
     async function removeQuestion(questionId) {
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from("exam_questions")
             .delete()
             .eq("exam_id", id)
-            .eq("question_id", questionId);
-        if (error) {
-            toast.error(`Could not remove: ${error.message}`);
+            .eq("question_id", questionId)
+            .select();
+
+        if (error || !data || data.length === 0) {
+            toast.error("Could not remove it. The exam may be locked.");
+            if (error) console.error(error);
             return;
         }
         const next = questions.filter((q) => q.id !== questionId);
@@ -78,6 +84,7 @@ export default function ReviewExam() {
     if (loading) return <PageLoader />;
     if (!exam) return <main className="p-8">Exam not found.</main>;
 
+    const locked = exam.status === "pending" || exam.status === "approved";
     const iconBtn = "inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer";
 
     return (
@@ -88,17 +95,27 @@ export default function ReviewExam() {
                 {exam.subject} · {exam.exam_type} · {exam.duration_minutes} min
             </p>
 
+            {locked && (
+                <div className="mt-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800">
+                    {exam.status === "pending"
+                        ? "This exam is waiting for admin approval, so it can't be edited. To make changes, withdraw it from My exams first."
+                        : "This exam is approved and published, so it can't be edited."}
+                </div>
+            )}
+
             <div className="mt-6 rounded-xl border border-border bg-card p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-medium">
                         {questions.length} of {exam.number_of_questions} questions added
                     </p>
-                    <Link
-                        href={`/Teacher/exams/${id}`}
-                        className="inline-flex items-center gap-2 rounded-md bg-primary px-4 h-9 text-sm font-medium text-white"
-                    >
-                        <Plus size={16} /> Add questions
-                    </Link>
+                    {!locked && (
+                        <Link
+                            href={`/Teacher/exams/${id}`}
+                            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 h-9 text-sm font-medium text-white"
+                        >
+                            <Plus size={16} /> Add questions
+                        </Link>
+                    )}
                 </div>
 
                 <div className="mt-4 space-y-3">
@@ -124,20 +141,23 @@ export default function ReviewExam() {
                                         ))}
                                     </ul>
                                 </div>
-                                <div className="flex items-center">
-                                    <button type="button" className={iconBtn} disabled={index === 0} onClick={() => move(index, -1)}>
-                                        <ArrowUp size={16} />
-                                    </button>
-                                    <button type="button" className={iconBtn} disabled={index === questions.length - 1} onClick={() => move(index, 1)}>
-                                        <ArrowDown size={16} />
-                                    </button>
-                                    <Link href={`/Teacher/questions/${q.id}/edit`} className={iconBtn}>
-                                        <Pencil size={16} />
-                                    </Link>
-                                    <button type="button" className={iconBtn} onClick={() => removeQuestion(q.id)}>
-                                        <X size={16} />
-                                    </button>
-                                </div>
+
+                                {!locked && (
+                                    <div className="flex items-center">
+                                        <button type="button" className={iconBtn} disabled={index === 0} onClick={() => move(index, -1)}>
+                                            <ArrowUp size={16} />
+                                        </button>
+                                        <button type="button" className={iconBtn} disabled={index === questions.length - 1} onClick={() => move(index, 1)}>
+                                            <ArrowDown size={16} />
+                                        </button>
+                                        <Link href={`/Teacher/questions/${q.id}/edit`} className={iconBtn}>
+                                            <Pencil size={16} />
+                                        </Link>
+                                        <button type="button" className={iconBtn} onClick={() => removeQuestion(q.id)}>
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
