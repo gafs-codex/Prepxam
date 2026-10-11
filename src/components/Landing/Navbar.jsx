@@ -7,9 +7,9 @@ export default function Navbar() {
                     <GraduationCap />
                 </span>
 
-                <span>
+                <h1 className='text-lg font-semibold'>
                     Prexam
-                </span>
+                </h1>
             </div>
 
             <div className='flex items-center gap-2'>

@@ -3,6 +3,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { GraduationCap, Bell } from "lucide-react";
 import UserMenu from "./UserMenu";
+import NotificationBell from "./NotificationBell";
 
 const links = [
     { href: "/Admin/dashboard", label: "Dashboard" },
@@ -41,10 +42,7 @@ export default function AdminDashboardNavbar() {
             </div>
 
             <div className="flex items-center gap-3">
-                <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 w-9 relative">
-                    <Bell className="h-5 w-5 text-muted" />
-                </button>
-
+                <NotificationBell />
                 <UserMenu />
             </div>
         </nav>
