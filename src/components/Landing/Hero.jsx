@@ -204,7 +204,7 @@ export default function Hero() {
             </section>
 
             {/* Final call to action */}
-            <section className="px-4 py-12">
+            {/* <section className="px-4 py-12">
                 <div className="rounded-2xl bg-primary px-6 py-12 text-center text-white sm:px-12">
                     <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Ready to run your next exam?</h2>
                     <p className="mx-auto mt-3 max-w-xl text-white/80">
@@ -225,7 +225,7 @@ export default function Hero() {
                         </Link>
                     </div>
                 </div>
-            </section>
+            </section> */}
 
             <footer className="px-4 py-8 text-center text-sm text-muted">
                 © {new Date().getFullYear()} Prepxam. All rights reserved.
