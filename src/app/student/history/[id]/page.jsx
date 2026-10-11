@@ -96,7 +96,6 @@ export default function ResultPage() {
                         </div>
                     ))}
                 </div>
-
                 {buttons}
             </div>
         </main>

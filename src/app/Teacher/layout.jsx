@@ -2,6 +2,8 @@
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { PageLoader } from "@/components/ui/Spinner"
+
 import TeacherDashboardNavbar from "@/components/TeacherDashboardNavbar";
 
 export default function StudentDashboardLayout({ children }) {
@@ -19,7 +21,7 @@ export default function StudentDashboardLayout({ children }) {
     }, [loading, profile, router]);
 
     if (loading || !profile || profile.role !== "teacher") {
-        return <div className="p-8">Loading...</div>;
+        return <PageLoader />;
     }
 
     return (
