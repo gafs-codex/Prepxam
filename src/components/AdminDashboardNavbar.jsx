@@ -26,6 +26,7 @@ export default function AdminDashboardNavbar() {
                 {links.map((link) => {
                     const isActive = pathname === link.href || pathname.startsWith(link.href + "/");
                     return (
+
                         <Link
                             key={link.href}
                             href={link.href}
@@ -35,6 +36,7 @@ export default function AdminDashboardNavbar() {
                         >
                             {link.label}
                         </Link>
+                        
                     )
                 })}
             </div>
