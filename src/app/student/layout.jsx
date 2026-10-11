@@ -20,7 +20,7 @@ export default function StudentDashboardLayout({ children }) {
     }, [loading, profile, router]);
 
     if (loading || !profile || profile.role !== "student") {
-        return <div className="p-8">Loading...</div>;
+        return <PageLoader />;
     }
 
     const takingExam = /^\/student\/exams\/[^/]+$/.test(pathname);
