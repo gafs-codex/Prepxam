@@ -3,6 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import StudentDashboardNavbar from "@/components/StudentDashboardNavbar";
+import { PageLoader } from "@/components/ui/Spinner"
 
 export default function StudentDashboardLayout({ children }) {
     const { profile, loading } = useAuth();
