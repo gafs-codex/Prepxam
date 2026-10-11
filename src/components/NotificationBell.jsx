@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase"
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
@@ -39,15 +40,19 @@ export default function NotificationBell() {
     }, []);
 
     useEffect(() => {
-        let channel;
+        let cancelled = false;
+        let channel = null;
+
         async function start() {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            if (!user || cancelled) return;
             setUserId(user.id);
+
             await load();
+            if (cancelled) return;
 
             channel = supabase
-                .channel(`notifications-${user.id}`)
+                .channel(`notifications-${user.id}-${Math.random().toString(36).slice(2)}`)
                 .on(
                     "postgres_changes",
                     { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
@@ -55,8 +60,13 @@ export default function NotificationBell() {
                 )
                 .subscribe();
         }
-        start();
-        return () => { if (channel) supabase.removeChannel(channel); };
+
+        start().catch((err) => console.error("Notifications:", err));
+
+        return () => {
+            cancelled = true;
+            if (channel) supabase.removeChannel(channel);
+        };
     }, [load]);
 
     const unread = items.filter((n) => !n.read).length;
@@ -91,18 +101,20 @@ export default function NotificationBell() {
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" sideOffset={8} className="w-80">
-                <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
-                    <span className="text-base font-semibold">Notifications</span>
-                    {unread > 0 && (
-                        <button
-                            type="button"
-                            onClick={markAllRead}
-                            className="text-xs font-medium text-primary hover:underline cursor-pointer"
-                        >
-                            Mark all as read
-                        </button>
-                    )}
-                </DropdownMenuLabel>
+                <DropdownMenuGroup>
+                    <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
+                        <span className="text-base font-semibold">Notifications</span>
+                        {unread > 0 && (
+                            <button
+                                type="button"
+                                onClick={markAllRead}
+                                className="text-xs font-medium text-primary hover:underline cursor-pointer"
+                            >
+                                Mark all as read
+                            </button>
+                        )}
+                    </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
 
                 <div className="max-h-96 overflow-y-auto">
