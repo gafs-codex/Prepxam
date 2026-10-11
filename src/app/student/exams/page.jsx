@@ -4,6 +4,7 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { PageLoader } from "@/components/ui/Spinner"
+import { MoveLeft } from 'lucide-react';
 
 export default function BrowseExams() {
     const [exams, setExams] = useState([]);
@@ -40,7 +41,7 @@ export default function BrowseExams() {
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
             <Link href={`/student/dashboard`} className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs active cursor-pointer mb-6">
-                Back to dashboard
+                <MoveLeft strokeWidth={1} size={20} /> Back to dashboard
             </Link>
 
             <h1 className="text-2xl font-semibold tracking-tight">Browse exams</h1>

@@ -3,8 +3,7 @@ import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import { Check, X, RotateCcw } from "lucide-react"
 import { supabase } from "@/lib/supabase"
-import { PageLoader } from "@/components/ui/Spinner"
-
+import { PageLoader, SectionLoader } from "@/components/ui/Spinner"
 const ROLES = [
     { key: "student", label: "Students" },
     { key: "teacher", label: "Teachers" },
@@ -61,7 +60,7 @@ export default function AdminUsers() {
 
         const { data, error } = await supabase
             .from("profiles")
-            .select("id, full_name, role, status, created_at")
+            .select("id, full_name, email, role, status, created_at")
             .eq("role", role)
             .eq("status", status)
             .order("created_at", { ascending: false });
@@ -159,9 +158,7 @@ export default function AdminUsers() {
 
             <div className="mt-6">
                 {loadingList ? (
-                    <div className="rounded-xl border border-dashed border-border p-16 text-center text-sm text-muted">
-                        Loading...
-                    </div>
+                    <SectionLoader />
                 ) : users.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-border p-16 text-center text-sm text-muted bg-white">
                         No {activeStatus} {activeRole}s.
@@ -173,36 +170,38 @@ export default function AdminUsers() {
                                 <div>
                                     <p className="font-medium">{u.full_name ?? "Unnamed"}</p>
                                     <p className="text-sm text-muted">
-                                        Registered {formatDate(u.created_at)}
+                                        {u.email ?? "No email"} · registered {formatDate(u.created_at)}
                                     </p>
                                 </div>
 
-                                <div className="flex gap-2">
-                                    {activeStatus !== "approved" && (
+                                <div className="flex items-center gap-3">
+                                    <span
+                                        className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${u.status === "approved"
+                                            ? "bg-green-100 text-green-700"
+                                            : u.status === "rejected"
+                                                ? "bg-red-100 text-red-700"
+                                                : "bg-yellow-100 text-yellow-800"
+                                            }`}
+                                    >
+                                        {u.status}
+                                    </span>
+
+                                    {u.status !== "approved" && (
                                         <button
                                             onClick={() => handleDecision(u.id, "approved")}
                                             disabled={actingOnId === u.id}
-                                            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white shadow hover:bg-primary/90 disabled:opacity-50"
+                                            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-sm font-medium text-white shadow hover:bg-primary/90 cursor-pointer disabled:opacity-50"
                                         >
                                             <Check size={16} /> Approve
                                         </button>
                                     )}
-                                    {activeStatus !== "rejected" && (
+                                    {u.status !== "rejected" && (
                                         <button
                                             onClick={() => handleDecision(u.id, "rejected")}
                                             disabled={actingOnId === u.id}
-                                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm hover:bg-accent disabled:opacity-50"
+                                            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm hover:bg-accent cursor-pointer disabled:opacity-50"
                                         >
                                             <X size={16} /> Reject
-                                        </button>
-                                    )}
-                                    {activeStatus !== "pending" && (
-                                        <button
-                                            onClick={() => handleDecision(u.id, "pending")}
-                                            disabled={actingOnId === u.id}
-                                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm hover:bg-accent disabled:opacity-50"
-                                        >
-                                            <RotateCcw size={16} /> Reset
                                         </button>
                                     )}
                                 </div>

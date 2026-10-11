@@ -20,6 +20,7 @@ export default function Register() {
     const [role, setRole] = useState("student");
     const [selectedSubjects, setSelectedSubjects] = useState([]);
     const [agreedToTerms, setAgreedToTerms] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     function toggleSubject(subject) {
         setSelectedSubjects((prev) =>
@@ -29,21 +30,31 @@ export default function Register() {
         );
     }
 
+    function changeRole(newRole) {
+        if (newRole === role) return;
+        setRole(newRole);
+        setSelectedSubjects([]); // a teacher's subjects shouldn't carry over to a student
+    }
+
     async function handleRegister(e) {
         e.preventDefault();
 
         if (fullName.trim() === "") {
-            toast.error("Please enter your full name")
+            toast.error("Please enter your full name");
             return;
         }
 
         if (email.trim() === "") {
-            toast.error("Please enter your email ")
-            return
+            toast.error("Please enter your email");
+            return;
+        } else if (!email.includes("@")) {
+            toast.error("Enter a valid email please");
+            return;
         }
-        else if (!email.includes("@")) {
-            toast.error("enter a valid email please")
-            return
+
+        if (password.length < 6) {
+            toast.error("Password must be at least 6 characters");
+            return;
         }
 
         if (password !== confirmPassword) {
@@ -51,8 +62,12 @@ export default function Register() {
             return;
         }
 
-        if (role === "teacher" && selectedSubjects.length === 0) {
-            toast.error("Please select at least one subject you teach");
+        if (selectedSubjects.length === 0) {
+            toast.error(
+                role === "teacher"
+                    ? "Please select at least one subject you teach"
+                    : "Please select the subjects you are offering"
+            );
             return;
         }
 
@@ -61,196 +76,166 @@ export default function Register() {
             return;
         }
 
+        setSubmitting(true);
 
-        const { data, error } = await supabase.auth.signUp({
-            email,
+        const { error } = await supabase.auth.signUp({
+            email: email.trim(),
             password,
             options: {
                 data: {
-                    full_name: fullName,
+                    full_name: fullName.trim(),
                     role: role,
-                    subjects: role === "teacher" ? selectedSubjects : [],
+                    subjects: selectedSubjects,
                 },
             },
         });
+
+        setSubmitting(false);
 
         if (error) {
             toast.error(error.message);
             return;
         }
 
-        toast.success("Account created! Check your email to confirm, then log in.");
+        toast.success("Account created! Check your email to confirm. The school must also approve your account before you can use it.");
     }
 
+    const inputClass = "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm focus:outline-none";
+    const labelClass = "text-sm font-medium leading-none";
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
             <div className="w-full max-w-md">
-                <div className="mb-6 flex items-center justify-center gap-2"></div>
-
-                <div className="rounded-2xl bg-card p-6 shadow-sm sm:p-8">
+                <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
                     <h1 className="text-xl font-semibold tracking-tight">
                         Create your account
                     </h1>
-
-                    <p className="mt-1 text-sm text-muted"></p>
+                    <p className="mt-1 text-sm text-muted">
+                        Your account needs approval from the school before you can use it.
+                    </p>
 
                     <div className="mt-6">
-                        <form
-                            onSubmit={handleRegister}
-                            className="space-y-4"
-                        >
+                        <form onSubmit={handleRegister} className="space-y-4">
                             <div className="space-y-2">
-                                <label
-                                    htmlFor=""
-                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                    Full name
-                                </label>
+                                <label htmlFor="fullName" className={labelClass}>Full name</label>
                                 <input
+                                    id="fullName"
                                     type="text"
                                     value={fullName}
                                     onChange={(e) => setFullName(e.target.value)}
-                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm focus:outline-none" />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label
-                                    htmlFor=""
-                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                    Email
-                                </label>
-
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm focus:outline-none" />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label
-                                    htmlFor=""
-                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                    Password
-                                </label>
-
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm focus:outline-none" />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label
-                                    htmlFor=""
-                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                    Confirm password
-                                </label>
-
-                                <input
-                                    type="password"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm focus:outline-none"
+                                    className={inputClass}
                                 />
                             </div>
 
-                            <div>
-                                <label
-                                    htmlFor=""
-                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                    I am a
-                                </label>
+                            <div className="space-y-2">
+                                <label htmlFor="email" className={labelClass}>Email</label>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className={inputClass}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label htmlFor="password" className={labelClass}>Password</label>
+                                <input
+                                    id="password"
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className={inputClass}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label htmlFor="confirmPassword" className={labelClass}>Confirm password</label>
+                                <input
+                                    id="confirmPassword"
+                                    type="password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className={inputClass}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <p className={labelClass}>I am a</p>
 
                                 <div className="grid grid-cols-2 gap-3">
-
-                                    <label
-                                        htmlFor="student"
-                                        className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm capitalize transition border-border"
-                                    >
-
-                                        <input
-                                            type="radio"
-                                            name="role"
-                                            id="student"
-                                            value="student"
-                                            checked={role === "student"}
-                                            onChange={(e) => setRole(e.target.value)}
-                                            className="cursor-pointer accent-blue-600 focus:ring-blue-500 h-4 w-4"
-                                        />
-                                        Student
-                                    </label>
-
-                                    <label
-                                        htmlFor="teacher"
-                                        className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm capitalize transition border-border"
-                                    >
-                                        {/* <button></button> */}
-                                        <input
-                                            type="radio"
-                                            name="role"
-                                            id="teacher"
-                                            value="teacher"
-                                            checked={role === "teacher"}
-                                            onChange={(e) => setRole(e.target.value)}
-                                            className="cursor-pointer accent-blue-600 focus:ring-blue-500 h-4 w-4"
-                                        />
-                                        Teacher
-                                    </label>
+                                    {["student", "teacher"].map((r) => (
+                                        <label
+                                            key={r}
+                                            htmlFor={r}
+                                            className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm capitalize transition ${role === r ? "border-primary bg-accent/40" : "border-border"}`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="role"
+                                                id={r}
+                                                value={r}
+                                                checked={role === r}
+                                                onChange={(e) => changeRole(e.target.value)}
+                                                className="h-4 w-4 cursor-pointer accent-blue-600 focus:ring-blue-500"
+                                            />
+                                            {r}
+                                        </label>
+                                    ))}
                                 </div>
                             </div>
 
-                            {role === "teacher" && (
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium leading-none">
-                                        Subjects you teach
-                                    </label>
-                                    <div className="flex flex-wrap gap-2 mt-2">
-                                        {SUBJECTS.map((subject) => {
-                                            const isSelected = selectedSubjects.includes(subject);
-                                            return (
-                                                <button
-                                                    key={subject}
-                                                    type="button"
-                                                    onClick={() => toggleSubject(subject)}
-                                                    className={
-                                                        isSelected
-                                                            ? "rounded-full border border-primary bg-primary px-4 py-2 text-sm font-medium text-white transition"
-                                                            : "rounded-full border border-border px-2.5 py-1 text-sm font-normal text-foreground transition hover:bg-accent"
-                                                    }
-                                                >
-                                                    {subject}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                            <div className="space-y-2">
+                                <p className={labelClass}>
+                                    {role === "teacher" ? "Subjects you teach" : "Subjects you are offering"}
+                                    <span className="ml-2 font-normal text-muted">
+                                        ({selectedSubjects.length} selected)
+                                    </span>
+                                </p>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                    {SUBJECTS.map((subject) => {
+                                        const isSelected = selectedSubjects.includes(subject);
+                                        return (
+                                            <button
+                                                key={subject}
+                                                type="button"
+                                                onClick={() => toggleSubject(subject)}
+                                                className={`rounded-full border px-3 py-1.5 text-sm transition cursor-pointer ${
+                                                    isSelected
+                                                        ? "border-primary bg-primary font-medium text-white"
+                                                        : "border-border text-foreground hover:bg-accent"
+                                                }`}
+                                            >
+                                                {subject}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
-                            )}
+                            </div>
 
-                            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"
-                            >
+                            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted">
                                 <input
                                     type="checkbox"
                                     name="terms"
                                     id="terms"
                                     checked={agreedToTerms}
                                     onChange={(e) => setAgreedToTerms(e.target.checked)}
-                                    className="h-3.5 w-3.5 cursor-pointer rounded-full accent-blue-600 focus:ring-blue-500"
+                                    className="h-3.5 w-3.5 cursor-pointer accent-blue-600 focus:ring-blue-500"
                                 />
                                 I agree to the terms of use and privacy policy.
                             </label>
 
                             <button
                                 type="submit"
-                                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors bg-primary text-white w-full py-1.5 px-3"
+                                disabled={submitting}
+                                className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                Create Account
+                                {submitting ? "Creating account..." : "Create Account"}
                             </button>
                         </form>
+
                         <p className="mt-6 text-center text-sm text-muted">
-                            Already registered? <Link href={`/login`} className="text-sm font-medium text-primary hover:underline">Log in</Link>
+                            Already registered? <Link href="/login" className="text-sm font-medium text-primary hover:underline">Log in</Link>
                         </p>
                     </div>
                 </div>
