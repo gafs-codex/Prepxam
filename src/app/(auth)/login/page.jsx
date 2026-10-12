@@ -33,7 +33,7 @@ export default function Login() {
 
         if (adminRow) {
             toast.success("Logged in!");
-            router.push("/Admin/dashboard");
+            router.push(adminRow.role === "super_admin" ? "/Super/platform" : "/Admin/dashboard");
             return;
         }
 

@@ -5,13 +5,13 @@ import { GraduationCap } from "lucide-react";
 import UserMenu from "./UserMenu";
 import NotificationBell from "./NotificationBell";
 
-const links = [
+const schoolLinks = [
     { href: "/Admin/dashboard", label: "Dashboard" },
     { href: "/Admin/user", label: "Users" },
     { href: "/Admin/exam", label: "Exams" },
 ];
 
-export default function AdminDashboardNavbar() {
+export default function AdminDashboardNavbar({ links = schoolLinks }) {
     const pathname = usePathname()
     return (
         <nav className="flex items-center justify-between border-b border-border bg-background px-8 py-4">
@@ -36,7 +36,7 @@ export default function AdminDashboardNavbar() {
                         >
                             {link.label}
                         </Link>
-                        
+
                     )
                 })}
             </div>
