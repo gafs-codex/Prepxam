@@ -42,7 +42,7 @@ export default function PlatformOverview() {
     ];
 
     return (
-        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
             <h1 className="text-2xl font-semibold tracking-tight">Platform overview</h1>
             <p className="mt-1 text-sm text-muted">
                 You own the platform. The school admin runs day-to-day approvals.

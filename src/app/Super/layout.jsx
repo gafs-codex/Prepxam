@@ -8,8 +8,8 @@ import AdminDashboardNavbar from "@/components/AdminDashboardNavbar"
 // add the other pages here as you build them
 const superLinks = [
     { href: "/Super/platform", label: "Platform" },
+    { href: "/Super/admins", label: "Admins" },
 ];
-
 export default function SuperLayout({ children }) {
     const router = useRouter();
     const [allowed, setAllowed] = useState(false);
