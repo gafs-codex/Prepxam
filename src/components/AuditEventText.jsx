@@ -39,6 +39,12 @@ export default function AuditEventText({ event }) {
             return <>{actor} added role to ({roleName(d.role)}) {target}</>;
         case "admin.removed":
             return <>{actor} removed the {roleName(d.role)} role from {target}</>;
+        case "user.disabled":
+            return <>{actor} disabled {d.role} {target}</>;
+        case "user.enabled":
+            return <>{actor} enabled {d.role} {target}</>;
+        case "user.role_changed":
+            return <>{actor} changed {target} from {d.from} to {d.to}</>;
         default:
             return <>{actor} {event.action} {target}</>;
     }
@@ -64,6 +70,9 @@ export function auditAction(event) {
         case "results.visibility": return "changed score visibility for";
         case "admin.added": return `added role to (${roleName(d.role)})`;
         case "admin.removed": return `removed role (${roleName(d.role)}) from`;
+        case "user.disabled": return `disabled ${d.role}`;
+        case "user.enabled": return `enabled ${d.role}`;
+        case "user.role_changed": return `changed role (${d.from} → ${d.to})`;
         default: return event.action;
     }
 }

@@ -20,10 +20,11 @@ export default function Login() {
             password,
         });
 
-        if (error) {
-            toast.error(error.message);
-            return;
-        }
+        toast.error(
+            error.message.toLowerCase().includes("banned")
+                ? "This account has been disabled. Please contact the school."
+                : error.message
+        );
 
         const { data: adminRow } = await supabase
             .from("admins")

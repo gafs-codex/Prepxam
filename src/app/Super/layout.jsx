@@ -9,6 +9,7 @@ import AdminDashboardNavbar from "@/components/AdminDashboardNavbar"
 const superLinks = [
     { href: "/Super/platform", label: "Platform" },
     { href: "/Super/admins", label: "Admins" },
+    { href: "/Super/users", label: "All users" },
     { href: "/Super/audit", label: "Audit log" },
 ];
 export default function SuperLayout({ children }) {

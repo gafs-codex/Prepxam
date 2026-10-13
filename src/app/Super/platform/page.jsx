@@ -47,8 +47,10 @@ export default function PlatformOverview() {
                 console.error(error);
                 return;
             }
-            setData(data);
-            
+            const { count } = await supabase
+                .from("profiles").select("*", { count: "exact", head: true }).eq("disabled", true);
+            setData({ ...data, disabled: count ?? 0 });
+
             const { data: log } = await supabase
                 .from("audit_log").select("*").order("created_at", { ascending: false }).limit(5);
             setEvents(log ?? []);
