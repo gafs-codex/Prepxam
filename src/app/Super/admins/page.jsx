@@ -145,11 +145,11 @@ export default function SuperAdmins() {
                                                     <span className="ml-2 rounded-full bg-accent px-2 py-0.5 text-xs font-normal">You</span>
                                                 )}
                                             </p>
-                                            <p className="truncate text-sm text-muted">
+                                            <p className="truncate text-xs text-muted">
                                                 {a.email ?? "No email"}{a.since ? ` · since ${formatDate(a.since)}` : ""}
                                             </p>
                                         </div>
-                                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${isSuper ? "bg-primary/10 text-primary" : "bg-accent"}`}>
+                                        <span className={`rounded-full px-3 py-0.5 text-xs font-medium ${isSuper ? "bg-primary/10 text-primary" : "bg-accent"}`}>
                                             {isSuper ? "Super Admin" : "School Admin"}
                                         </span>
                                         {!isSuper && (
@@ -157,7 +157,7 @@ export default function SuperAdmins() {
                                                 type="button"
                                                 disabled={busy}
                                                 onClick={() => setRemoving(a)}
-                                                className="inline-flex h-8.5 items-center rounded-md border border-input bg-background px-4 text-sm font-medium text-red-600 shadow-sm cursor-pointer hover:bg-accent disabled:opacity-60"
+                                                className="inline-flex h-8 items-center rounded-lg border border-input bg-background px-4 text-sm font-medium text-red-600 shadow-sm cursor-pointer hover:bg-accent disabled:opacity-60"
                                             >
                                                 Remove
                                             </button>
