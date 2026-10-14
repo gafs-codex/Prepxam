@@ -176,7 +176,7 @@ export default function AdminUsers() {
 
                                 <div className="flex items-center gap-3">
                                     <span
-                                        className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${u.status === "approved"
+                                        className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${u.status === "approved"
                                             ? "bg-green-100 text-green-700"
                                             : u.status === "rejected"
                                                 ? "bg-red-100 text-red-700"
@@ -190,7 +190,7 @@ export default function AdminUsers() {
                                         <button
                                             onClick={() => handleDecision(u.id, "approved")}
                                             disabled={actingOnId === u.id}
-                                            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-sm font-medium text-white shadow hover:bg-primary/90 cursor-pointer disabled:opacity-50"
+                                            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-2.5 text-sm font-medium text-white shadow hover:bg-primary/90 cursor-pointer disabled:opacity-50"
                                         >
                                             <Check size={16} /> Approve
                                         </button>
@@ -199,7 +199,7 @@ export default function AdminUsers() {
                                         <button
                                             onClick={() => handleDecision(u.id, "rejected")}
                                             disabled={actingOnId === u.id}
-                                            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm hover:bg-accent cursor-pointer disabled:opacity-50"
+                                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-sm font-medium shadow-sm hover:bg-accent cursor-pointer disabled:opacity-50"
                                         >
                                             <X size={16} /> Reject
                                         </button>

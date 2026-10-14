@@ -4,6 +4,7 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { findExamProblems } from "@/lib/examChecks"
+import { PageLoader, SectionLoader } from "@/components/ui/Spinner"
 
 const FILTERS = ["pending", "approved", "rejected", "draft", "all"];
 
@@ -121,7 +122,7 @@ export default function AdminExams() {
 
             <div className="mt-6 space-y-3">
                 {loading ? (
-                    <p className="text-sm text-muted">Loading exams...</p>
+                    <SectionLoader />
                 ) : visible.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted bg-white">
                         No exams here.
