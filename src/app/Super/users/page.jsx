@@ -236,7 +236,7 @@ export default function AllUsers() {
                                         <td className="px-6 py-4 text-muted">{u.email ?? "—"}</td>
                                         <td className="px-6 py-4">{roleLabel}</td>
                                         <td className="px-6 py-4">
-                                            <span className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${badgeStyles[state] ?? "bg-accent"}`}>
+                                            <span className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${badgeStyles[state] ?? "bg-accent"}`}>
                                                 {state}
                                             </span>
                                         </td>

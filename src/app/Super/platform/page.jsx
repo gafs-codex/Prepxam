@@ -153,12 +153,12 @@ export default function PlatformOverview() {
                         {events.length === 0 ? (
                             <p className="p-5 text-sm text-muted">Nothing yet.</p>
                         ) : (
-                            events.slice(0, 5).map((event, i) => (
-                                <div key={i} className="flex items-center justify-between gap-4 px-5 py-4">
+                            events.slice(0, 5).map((event) => (
+                                <div key={event.id} className="flex items-center justify-between gap-4 px-5 py-4">
                                     <p className="text-sm sm:text-base">
-                                        <EventText event={event} />
+                                        <AuditEventText event={event} />
                                     </p>
-                                    <span className="shrink-0 text-sm text-muted">{formatDate(event.at)}</span>
+                                    <span className="shrink-0 text-sm text-muted">{formatDate(event.created_at)}</span>
                                 </div>
                             ))
                         )}
