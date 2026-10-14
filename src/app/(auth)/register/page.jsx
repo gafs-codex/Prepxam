@@ -3,6 +3,7 @@ import Link from "next/link"
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import PasswordInput from "@/components/PasswordInput";
 
 const SUBJECTS = [
     "Mathematics", "English Language", "Physics", "Chemistry",
@@ -34,6 +35,16 @@ export default function Register() {
         if (newRole === role) return;
         setRole(newRole);
         setSelectedSubjects([]); // a teacher's subjects shouldn't carry over to a student
+    }
+
+    function resetForm() {
+        setFullName("");
+        setEmail("");
+        setPassword("");
+        setConfirmPassword("");
+        setRole("student");
+        setSelectedSubjects([]);
+        setAgreedToTerms(false);
     }
 
     async function handleRegister(e) {
@@ -97,7 +108,11 @@ export default function Register() {
             return;
         }
 
-        toast.success("Account created! Check your email to confirm. The school must also approve your account before you can use it.");
+        resetForm();
+        toast.success(
+            "Account created! The school must also approve your account before you can use it.",
+            { duration: 8000 }
+        );
     }
 
     const inputClass = "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm focus:outline-none";
@@ -140,23 +155,21 @@ export default function Register() {
 
                             <div className="space-y-2">
                                 <label htmlFor="password" className={labelClass}>Password</label>
-                                <input
+                                <PasswordInput
                                     id="password"
-                                    type="password"
+                                    autoComplete="new-password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className={inputClass}
                                 />
                             </div>
 
                             <div className="space-y-2">
                                 <label htmlFor="confirmPassword" className={labelClass}>Confirm password</label>
-                                <input
+                                <PasswordInput
                                     id="confirmPassword"
-                                    type="password"
+                                    autoComplete="new-password"
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className={inputClass}
                                 />
                             </div>
 
@@ -200,11 +213,10 @@ export default function Register() {
                                                 key={subject}
                                                 type="button"
                                                 onClick={() => toggleSubject(subject)}
-                                                className={`rounded-full border px-3 py-1.5 text-sm transition cursor-pointer ${
-                                                    isSelected
-                                                        ? "border-primary bg-primary font-medium text-white"
-                                                        : "border-border text-foreground hover:bg-accent"
-                                                }`}
+                                                className={`rounded-full border px-3 py-1.5 text-sm transition cursor-pointer ${isSelected
+                                                    ? "border-primary bg-primary font-medium text-white"
+                                                    : "border-border text-foreground hover:bg-accent"
+                                                    }`}
                                             >
                                                 {subject}
                                             </button>
