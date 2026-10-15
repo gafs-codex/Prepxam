@@ -6,6 +6,8 @@ import { Search } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import FilterDropdown from "@/components/FilterDropdown"
 import { SectionLoader } from "@/components/ui/Spinner"
+import { apiPost } from "@/lib/api"
+import { friendlyMessage, notifyError, withTimeout } from "@/lib/net"
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -46,10 +48,15 @@ export default function AllUsers() {
     const [reloadKey, setReloadKey] = useState(0);
     const [dialog, setDialog] = useState(null); // { type: "disable" | "enable" | "role", user }
     const [busy, setBusy] = useState(false);
+    const [loadError, setLoadError] = useState(null);
 
     useEffect(() => {
         async function loadAdmins() {
-            const { data } = await supabase.from("admins").select("user_id, role");
+            const { data, error } = await supabase.from("admins").select("user_id, role");
+            if (error) {
+                console.error(error);
+                return;
+            }
             setAdminRoles(Object.fromEntries((data ?? []).map((a) => [a.user_id, a.role])));
         }
         loadAdmins();
@@ -69,34 +76,38 @@ export default function AllUsers() {
 
         async function load() {
             setLoading(true);
+            setLoadError(null);
 
-            let request = supabase
-                .from("profiles")
-                .select("id, full_name, email, role, status, disabled, created_at", { count: "exact" })
-                .order("created_at", { ascending: false })
-                .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+            try {
+                let request = supabase
+                    .from("profiles")
+                    .select("id, full_name, email, role, status, disabled, created_at", { count: "exact" })
+                    .order("created_at", { ascending: false })
+                    .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
-            if (role !== "all") request = request.eq("role", role);
+                if (role !== "all") request = request.eq("role", role);
 
-            if (status === "Disabled") request = request.eq("disabled", true);
-            else if (status !== "All statuses") request = request.eq("status", status.toLowerCase()).eq("disabled", false);
+                if (status === "Disabled") request = request.eq("disabled", true);
+                else if (status !== "All statuses") request = request.eq("status", status.toLowerCase()).eq("disabled", false);
 
-            const term = query.replace(/[%,()*]/g, " ").trim();
-            if (term) request = request.or(`full_name.ilike.%${term}%,email.ilike.%${term}%`);
+                const term = query.replace(/[%,()*]/g, " ").trim();
+                if (term) request = request.or(`full_name.ilike.%${term}%,email.ilike.%${term}%`);
 
-            const { data, error, count } = await request;
-            if (cancelled) return;
+                const { data, error, count } = await withTimeout(request, 15000);
+                if (error) throw error;
+                if (cancelled) return;
 
-            if (error) {
-                toast.error(`Could not load users: ${error.message}`);
-                console.error(error);
-                setUsers([]);
-                setTotal(0);
-            } else {
                 setUsers(data ?? []);
                 setTotal(count ?? 0);
+            } catch (err) {
+                console.error(err);
+                if (cancelled) return;
+                setLoadError(friendlyMessage(err));
+                setUsers([]);
+                setTotal(0);
+            } finally {
+                if (!cancelled) setLoading(false);
             }
-            setLoading(false);
         }
 
         load();
@@ -113,20 +124,15 @@ export default function AllUsers() {
 
         if (type === "role") {
             const newRole = user.role === "student" ? "teacher" : "student";
-            const { error } = await supabase.rpc("change_user_role", { p_user_id: user.id, p_role: newRole });
-            failure = error?.message ?? null;
+            try {
+                const { error } = await supabase.rpc("change_user_role", { p_user_id: user.id, p_role: newRole });
+                if (error) failure = friendlyMessage(error);
+            } catch (err) {
+                failure = friendlyMessage(err);
+            }
         } else {
-            const { data: { session } } = await supabase.auth.getSession();
-            const res = await fetch("/api/users", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${session?.access_token ?? ""}`,
-                },
-                body: JSON.stringify({ userId: user.id, disabled: type === "disable" }),
-            });
-            const result = await res.json().catch(() => ({}));
-            if (!res.ok) failure = result.error ?? "Something went wrong";
+            const result = await apiPost("/api/users", { userId: user.id, disabled: type === "disable" });
+            if (!result.ok) failure = result.error;
         }
 
         setBusy(false);
@@ -207,6 +213,18 @@ export default function AllUsers() {
             <div className="mt-6 min-h-[24rem] overflow-x-auto rounded-xl border border-border bg-card">
                 {loading ? (
                     <SectionLoader />
+                ) : loadError ? (
+                    <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
+                        <p className="font-medium">Couldn't load users</p>
+                        <p className="mt-1 max-w-sm text-sm text-muted">{loadError}</p>
+                        <button
+                            type="button"
+                            onClick={() => setReloadKey((k) => k + 1)}
+                            className="mt-4 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-white cursor-pointer"
+                        >
+                            Try again
+                        </button>
+                    </div>
                 ) : users.length === 0 ? (
                     <p className="p-10 text-center text-sm text-muted">No users match your search.</p>
                 ) : (

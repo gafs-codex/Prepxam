@@ -5,7 +5,10 @@ import { toast } from "sonner"
 import { ShieldCheck, TriangleAlert, ArrowRight } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { PageLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
 import AuditEventText from "@/components/AuditEventText"
+import { useLoader } from "@/lib/useLoader"
+import { ensure } from "@/lib/net"
 
 function formatDate(value) {
     return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -36,30 +39,21 @@ function formatDate(value) {
 // }
 
 export default function PlatformOverview() {
-    const [data, setData] = useState(null);
-    const [events, setEvents] = useState([]);
+    const { data, error, loading, reload } = useLoader(async () => {
+        const { data: overview } = ensure(await supabase.rpc("platform_overview"))
+        const { count } = ensure(
+            await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("disabled", true)
+        )
+        const { data: log } = ensure(
+            await supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(5)
+        )
+        return { ...overview, disabled: count ?? 0, events: log ?? [] }
+    }, [])
 
-    useEffect(() => {
-        async function load() {
-            const { data, error } = await supabase.rpc("platform_overview");
-            if (error) {
-                toast.error(`Could not load the overview: ${error.message}`);
-                console.error(error);
-                return;
-            }
-            const { count } = await supabase
-                .from("profiles").select("*", { count: "exact", head: true }).eq("disabled", true);
-            setData({ ...data, disabled: count ?? 0 });
+    if (loading) return <PageLoader />;
+    if (error) return <ErrorState message={error} onRetry={reload} />;
 
-            const { data: log } = await supabase
-                .from("audit_log").select("*").order("created_at", { ascending: false }).limit(5);
-            setEvents(log ?? []);
-        }
-        load();
-    }, []);
-
-    if (!data) return <PageLoader />;
-
+    const events = data.events ?? [];
     const adminList = data.admin_list ?? [];
     // const events = data.events ?? [];
 

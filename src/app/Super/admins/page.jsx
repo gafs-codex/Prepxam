@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { Search, Eye, EyeOff } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { PageLoader } from "@/components/ui/Spinner"
+import { apiPost } from "@/lib/api"
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -59,21 +60,11 @@ export default function SuperAdmins() {
         }
 
         setAdding(true);
-        const { data: { session } } = await supabase.auth.getSession();
-
-        const res = await fetch("/api/admins", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${session?.access_token ?? ""}`,
-            },
-            body: JSON.stringify({ fullName, email, password }),
-        });
-        const result = await res.json().catch(() => ({}));
+        const result = await apiPost("/api/admins", { fullName, email, password });
         setAdding(false);
 
-        if (!res.ok) {
-            toast.error(result.error ?? "Could not add the admin");
+        if (!result.ok) {
+            toast.error(result.error);
             return;
         }
 
