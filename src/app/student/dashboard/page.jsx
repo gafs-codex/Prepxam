@@ -1,56 +1,55 @@
 "use client"
-import { useState, useEffect } from "react";
 import Link from "next/link"
-import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import StatCard from "@/components/ui/StatCard"
 import { PageLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"          // NEW
+import { useLoader } from "@/lib/useLoader"                  // NEW
+import { ensure } from "@/lib/net"                           // NEW
 
 const linkBtn = "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs";
 
 export default function StudentDashboard() {
-    const { profile, loading } = useAuth();
-    const [data, setData] = useState(null);
+    const { profile, loading: authLoading } = useAuth();
 
-    useEffect(() => {
-        async function load() {
-            const [examRes, mineRes] = await Promise.all([
-                supabase.from("exams")
-                    .select("id, title, subject, exam_type, duration_minutes, number_of_questions")
-                    .eq("status", "approved")
-                    .order("created_at", { ascending: false }),
-                supabase.rpc("my_attempts"),
-            ]);
+    // CHANGE 1: the useState + useEffect + load() trio becomes one useLoader call.
+    // Every Supabase call is wrapped in ensure(), and the function RETURNS the data.
+    const { data, error, loading, reload } = useLoader(async () => {
+        const [examRes, mineRes] = await Promise.all([
+            supabase.from("exams")
+                .select("id, title, subject, exam_type, duration_minutes, number_of_questions")
+                .eq("status", "approved")
+                .order("created_at", { ascending: false }),
+            supabase.rpc("my_attempts"),
+        ]);
 
-            if (examRes.error || mineRes.error) {
-                toast.error("Could not load your dashboard");
-                console.error(examRes.error, mineRes.error);
-            }
+        ensure(examRes);   // throws if the call failed, so useLoader shows the error state
+        ensure(mineRes);
 
-            const mine = mineRes.data ?? [];
-            const submitted = mine.filter((a) => a.submitted_at);
-            const doneIds = new Set(submitted.map((a) => a.exam_id));
-            const inProgressIds = new Set(mine.filter((a) => !a.submitted_at).map((a) => a.exam_id));
+        const mine = mineRes.data ?? [];
+        const submitted = mine.filter((a) => a.submitted_at);
+        const doneIds = new Set(submitted.map((a) => a.exam_id));
+        const inProgressIds = new Set(mine.filter((a) => !a.submitted_at).map((a) => a.exam_id));
 
-            // only scores the student is allowed to see
-            const percents = submitted
-                .filter((a) => a.score_visible && a.total > 0)
-                .map((a) => Math.round((a.score / a.total) * 100));
+        // only scores the student is allowed to see
+        const percents = submitted
+            .filter((a) => a.score_visible && a.total > 0)
+            .map((a) => Math.round((a.score / a.total) * 100));
 
-            setData({
-                available: (examRes.data ?? []).filter((e) => !doneIds.has(e.id)),
-                inProgressIds,
-                taken: submitted.length,
-                average: percents.length ? Math.round(percents.reduce((s, p) => s + p, 0) / percents.length) : null,
-                best: percents.length ? Math.max(...percents) : null,
-                recent: submitted.slice(0, 3),
-            });
-        }
-        load();
+        return {
+            available: (examRes.data ?? []).filter((e) => !doneIds.has(e.id)),
+            inProgressIds,
+            taken: submitted.length,
+            average: percents.length ? Math.round(percents.reduce((s, p) => s + p, 0) / percents.length) : null,
+            best: percents.length ? Math.max(...percents) : null,
+            recent: submitted.slice(0, 3),
+        };
     }, []);
 
-    if (loading || !data) return <PageLoader />;
+    // CHANGE 2: three states instead of one spinner check
+    if (authLoading || loading) return <PageLoader />;
+    if (error) return <ErrorState message={error} onRetry={reload} />;
 
     const stats = [
         { label: "Exams Taken", value: data.taken },

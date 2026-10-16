@@ -4,27 +4,28 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { PageLoader } from "@/components/ui/Spinner"
 import TeacherDashboardNavbar from "@/components/TeacherDashboardNavbar";
+import ErrorState from "@/components/ui/ErrorState";
 import AccessGate from "@/components/AccessGate";
 import { homeFor } from "@/lib/home";
 
 export default function TeacherLayout({ children }) {
-    const { profile, loading } = useAuth();
+    const { profile, loading, error, refresh } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
         if (loading) return;
         if (!profile) {
-            router.replace("/login");
+            if (!error) router.replace("/login");   // a failed load is not a sign-out
             return;
         }
         if (profile.role !== "teacher") {
             homeFor(profile.role).then((path) => router.replace(path));
         }
-    }, [loading, profile, router]);
+    }, [loading, profile, error, router]);
 
-    if (loading || !profile || profile.role !== "teacher") {
-        return <PageLoader />;
-    }
+    if (loading) return <PageLoader />;
+    if (!profile && error) return <ErrorState message={error} onRetry={refresh} />;
+    if (!profile || profile.role !== "teacher") return <PageLoader />;
 
     return (
         <div className="min-h-screen bg-background">

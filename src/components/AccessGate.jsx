@@ -5,6 +5,7 @@ import { Clock, XCircle, Ban, TriangleAlert } from "lucide-react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { PageLoader } from "@/components/ui/Spinner"
+import { isNetworkError } from "@/lib/rpc"
 
 const MESSAGES = {
     pending: {
@@ -41,8 +42,14 @@ export default function AccessGate({ children }) {
     const [checking, setChecking] = useState(false)
 
     const check = useCallback(async () => {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
+        // getSession reads the saved session, so a dropped connection isn't mistaken for a logout
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+
+        if (sessionError && isNetworkError(sessionError)) {
+            setState((current) => (current === "loading" ? "error" : current))
+            return "error"
+        }
+        if (!session) {
             router.replace("/login")
             return "none"
         }
@@ -50,7 +57,7 @@ export default function AccessGate({ children }) {
         const { data, error } = await supabase
             .from("profiles")
             .select("full_name, email, status, disabled")
-            .eq("id", user.id)
+            .eq("id", session.user.id)
             .single()
 
         if (error) {
