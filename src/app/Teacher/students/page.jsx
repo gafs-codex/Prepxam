@@ -1,36 +1,28 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { Search } from "lucide-react"
-import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import FilterDropdown from "@/components/FilterDropdown"
 import { SectionLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
+import { useLoader } from "@/lib/useLoader"
+import { ensure } from "@/lib/net"
 
 function formatDate(value) {
     return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 export default function TeacherStudents() {
-    const [students, setStudents] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [subject, setSubject] = useState("All subjects");
 
-    useEffect(() => {
-        async function load() {
-            const { data, error } = await supabase.rpc("teacher_students");
-            if (error) {
-                toast.error(`Could not load students: ${error.message}`);
-                console.error(error);
-            } else {
-                setStudents(data ?? []);
-            }
-            setLoading(false);
-        }
-        load();
+    const { data, error, loading, reload } = useLoader(async () => {
+        const { data } = ensure(await supabase.rpc("teacher_students"));
+        return data ?? [];
     }, []);
 
+    const students = data ?? [];
     const subjectOptions = ["All subjects", ...new Set(students.flatMap((s) => s.shared_subjects ?? []))];
 
     const visible = students.filter((s) => {
@@ -43,7 +35,7 @@ export default function TeacherStudents() {
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
             <h1 className="text-2xl font-semibold tracking-tight">Students</h1>
             <p className="mt-1 text-sm text-muted">
-                {students.length} {students.length === 1 ? "student" : "students"} offering your subjects.
+                {data ? `${students.length} ${students.length === 1 ? "student" : "students"} offering your subjects.` : "\u00A0"}
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -65,6 +57,8 @@ export default function TeacherStudents() {
             <div className="mt-6">
                 {loading ? (
                     <SectionLoader />
+                ) : error ? (
+                    <ErrorState compact title="Couldn't load your students" message={error} onRetry={reload} />
                 ) : visible.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-border bg-white p-10 text-center text-sm text-muted">
                         {students.length === 0

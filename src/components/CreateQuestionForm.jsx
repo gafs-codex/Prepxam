@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import FilterDropdown from "@/components/FilterDropdown";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner"
+import { safe, notifyError } from "@/lib/net";
+import { isNetworkError } from "@/lib/rpc";
 
 const QuestionTypes = ["Multiple choice", "True or false", "Fill in the gap"];
 const ExamTypes = ["Internal test", "WAEC", "NECO", "JAMB", "GCE"]
@@ -17,6 +19,7 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
     const [options, setOptions] = useState(["", "", "", ""]);
     const [correctIndex, setCorrectIndex] = useState(null);
     const [explanation, setExplanation] = useState("");
+    const [submitting, setSubmitting] = useState(false);
 
     const subject = lockedSubject ?? subjectState;
     const examType = lockedExamType ?? examTypeState;
@@ -34,19 +37,24 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
         setQuestionType(type);
     }
 
+
     useEffect(() => {
         if (lockedSubject) return;
+        let cancelled = false;
 
         async function loadSubjects() {
-            const { data: { user } } = await supabase.auth.getUser();
-            const teacherSubjects = user?.user_metadata?.subjects ?? [];
+            const { data: { session } } = await supabase.auth.getSession();
+            if (cancelled) return;
+            const teacherSubjects = session?.user?.user_metadata?.subjects ?? [];
 
             setSubjects(teacherSubjects);
             if (teacherSubjects.length > 0) {
                 setSubjectState(teacherSubjects[0]);
             }
         }
-        loadSubjects();
+        loadSubjects().catch((err) => console.error(err));
+
+        return () => { cancelled = true; };
     }, [lockedSubject]);
 
     function updateOption(id, value) {
@@ -59,6 +67,7 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
 
     async function handleSubmit(e) {
         e.preventDefault();
+        if (submitting) return;
 
         if (questionText.trim() === "") {
             toast.error("Question field cannot be empty");
@@ -78,30 +87,42 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
             toast.error("Please pick the correct option");
             return;
         }
-        const { data: { user } } = await supabase.auth.getUser();
 
-        if (!user) {
-            toast.error("You must be logged in to create a question");
+        setSubmitting(true);
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            setSubmitting(false);
+            toast.error("Your session has expired. Please log in again.");
             return;
         }
-        const { data, error } = await supabase
-            .from("questions")
-            .insert({
-                question_text: questionText,
-                question_type: questionType,
-                subject: subject,
-                exam_type: examType,
-                options: options,
-                correct_index: correctIndex,
-                explanation: explanation,
-                created_by: user.id,
-            })
-            .select()
-            .single();
+
+        const { data, error } = await safe(
+            supabase
+                .from("questions")
+                .insert({
+                    question_text: questionText,
+                    question_type: questionType,
+                    subject: subject,
+                    exam_type: examType,
+                    options: options,
+                    correct_index: correctIndex,
+                    explanation: explanation,
+                    created_by: session.user.id,
+                })
+                .select()
+                .single(),
+            20000
+        );
+
+        setSubmitting(false);
 
         if (error) {
-            toast.error(`Failed to save question: ${error.message}`);
-            console.error(error);
+            if (isNetworkError(error)) {
+                toast.error("We couldn't confirm the question was saved. Check your connection, and look in your question bank before saving it again.");
+            } else {
+                notifyError(error, "Failed to save question");
+            }
             return;
         }
 
@@ -213,8 +234,8 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
                         </div>
 
                         <div className="flex gap-3 items-center">
-                            <button type="submit" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer bg-primary text-white shadow hover:bg-primary/90 h-9 px-4 py-2">
-                                {submitLabel}
+                            <button type="submit" disabled={submitting} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer bg-primary text-white shadow hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-60 disabled:cursor-not-allowed">
+                                {submitting ? "Saving..." : submitLabel}
                             </button>
 
                             <button

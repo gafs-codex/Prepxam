@@ -7,44 +7,64 @@ import { supabase } from "@/lib/supabase"
 import { findExamProblems } from "@/lib/examChecks"
 import ResultsPanel from "@/components/ResultsPanel"
 import { PageLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
+import { useLoader } from "@/lib/useLoader"
+import { ensure, safe, notifyError } from "@/lib/net"
 
 export default function AdminExamDetail() {
     const { id } = useParams();
-    const [exam, setExam] = useState(null);
-    const [questions, setQuestions] = useState([]);
-    const [teacher, setTeacher] = useState("");
-    const [loading, setLoading] = useState(true);
     const [note, setNote] = useState("");
     const [saving, setSaving] = useState(false);
 
-    useEffect(() => {
-        async function load() {
-            const { data: examData, error } = await supabase
-                .from("exams").select("*").eq("id", id).single();
-            if (error) {
-                toast.error("Could not load exam");
-                setLoading(false);
-                return;
-            }
-            setExam(examData);
-            setNote(examData.review_note ?? "");
+    const { data, setData, error, loading, reload } = useLoader(async () => {
+        const examRes = ensure(
+            await supabase.from("exams").select("*").eq("id", id).maybeSingle()
+        );
+        if (!examRes.data) return { exam: null, questions: [], teacher: "" };
 
-            const { data: links } = await supabase
+        const linksRes = ensure(
+            await supabase
                 .from("exam_questions")
                 .select("position, questions(*)")
                 .eq("exam_id", id)
-                .order("position");
-            setQuestions((links ?? []).map((l) => l.questions).filter(Boolean));
+                .order("position")
+        );
 
-            const { data: profile } = await supabase
-                .from("profiles").select("full_name").eq("id", examData.created_by).maybeSingle();
-            setTeacher(profile?.full_name ?? "Unknown teacher");
-            setLoading(false);
-        }
-        load();
+        // the teacher's name is nice to have. The page still works without it.
+        const { data: profile } = await safe(
+            supabase.from("profiles").select("full_name").eq("id", examRes.data.created_by).maybeSingle()
+        );
+
+        return {
+            exam: examRes.data,
+            questions: (linksRes.data ?? []).map((l) => l.questions).filter(Boolean),
+            teacher: profile?.full_name ?? "Unknown teacher",
+        };
     }, [id]);
 
+    // fill the note box once, when the exam first loads
+    useEffect(() => {
+        if (data?.exam) setNote(data.exam.review_note ?? "");
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data?.exam?.id]);
+
+    if (loading) return <PageLoader />;
+    if (error) return <ErrorState message={error} onRetry={reload} />;
+    if (!data?.exam) {
+        return (
+            <main className="mx-auto max-w-2xl px-4 py-12 text-center">
+                <p>This exam doesn't exist.</p>
+                <Link href="/Admin/exams" className="mt-4 inline-block text-primary hover:underline">Back to all exams</Link>
+            </main>
+        );
+    }
+
+    const { exam, questions, teacher } = data;
+    const problems = findExamProblems(exam, questions);
+
     async function decide(newStatus) {
+        if (saving) return;
+
         if (newStatus === "rejected" && note.trim() === "") {
             toast.error("Please write a note so the teacher knows what to fix");
             return;
@@ -54,33 +74,32 @@ export default function AdminExamDetail() {
         }
 
         setSaving(true);
-        const { data, error } = await supabase
-            .from("exams")
-            .update({
-                status: newStatus,
-                review_note: newStatus === "rejected" ? note.trim() : null,
-            })
-            .eq("id", id)
-            .select()
-            .single();
+        const { data: updated, error: updateError } = await safe(
+            supabase
+                .from("exams")
+                .update({
+                    status: newStatus,
+                    review_note: newStatus === "rejected" ? note.trim() : null,
+                })
+                .eq("id", id)
+                .select()
+                .single(),
+            20000
+        );
         setSaving(false);
 
-        if (error) {
-            toast.error(`Could not update: ${error.message}`);
+        if (updateError) {
+            notifyError(updateError, "Could not update");
             return;
         }
-        setExam(data);
+
+        setData((prev) => ({ ...prev, exam: updated }));
         toast.success(newStatus === "approved" ? "Exam approved" : "Exam rejected");
     }
 
-    if (loading) return <PageLoader />;
-    if (!exam) return <main className="p-8">Exam not found.</main>;
-
-    const problems = findExamProblems(exam, questions);
-
     return (
         <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-            <Link href="/Admin/exam" className="text-sm text-muted">← All exams</Link>
+            <Link href="/Admin/exams" className="text-sm text-muted">← All exams</Link>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">{exam.title}</h1>
             <p className="mt-1 text-sm text-muted">
                 {teacher} · {exam.subject} · {exam.exam_type} · {exam.duration_minutes} min · status: <span className="font-medium capitalize">{exam.status}</span>
@@ -131,11 +150,11 @@ export default function AdminExamDetail() {
                     <div className="mt-4 flex gap-3">
                         <button
                             type="button"
-                            disabled={saving || exam.status === "approved"}
+                            disabled={saving}
                             onClick={() => decide("approved")}
                             className="inline-flex h-9 items-center rounded-md bg-green-600 px-4 text-sm font-medium text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Approve
+                            {saving ? "Saving..." : "Approve"}
                         </button>
                         <button
                             type="button"
@@ -149,7 +168,12 @@ export default function AdminExamDetail() {
                 </div>
             )}
 
-            {exam.status === "approved" && <ResultsPanel exam={exam} onChange={setExam} />}
+            {exam.status === "approved" && (
+                <ResultsPanel
+                    exam={exam}
+                    onChange={(updated) => setData((prev) => ({ ...prev, exam: updated }))}
+                />
+            )}
         </main>
     )
 }

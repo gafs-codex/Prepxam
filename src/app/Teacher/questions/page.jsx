@@ -1,10 +1,13 @@
 "use client"
 import Link from "next/link"
 import { Plus, Search, Pencil, Trash2 } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import FilterDropdown from "@/components/FilterDropdown"
 import { supabase } from "@/lib/supabase"
 import { SectionLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
+import { useLoader } from "@/lib/useLoader"
+import { ensure, safe, notifyError } from "@/lib/net"
 import { toast } from "sonner"
 import {
     AlertDialog,
@@ -17,55 +20,56 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
+
 const QuestionType = ["All types", "Multiple choice", "True or false", "Fill in the gap"]
 
 export default function QuestionBank() {
     const [questionType, setQuestionType] = useState("All types")
     const [search, setSearch] = useState("")
-    const [questions, setQuestions] = useState([])
-    const [lockedIds, setLockedIds] = useState([])
-    const [loading, setLoading] = useState(true)
 
-    useEffect(() => {
-        loadQuestions();
-    }, []);
-
-    async function loadQuestions() {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-            setLoading(false);
-            return;
-        }
+    const { data, setData, error, loading, reload } = useLoader(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("Your session has expired. Please log in again.");
 
         const [questionsRes, lockedRes] = await Promise.all([
             supabase
                 .from("questions")
                 .select("*")
-                .eq("created_by", user.id)
+                .eq("created_by", session.user.id)
                 .order("created_at", { ascending: false }),
             supabase.rpc("locked_question_ids"),
         ]);
 
-        if (!questionsRes.error) setQuestions(questionsRes.data);
-        if (!lockedRes.error) setLockedIds(lockedRes.data ?? []);
-        setLoading(false);
-    }
+        ensure(questionsRes);
+        // the lock badges are a nicety. The database still blocks edits if this fails.
+        if (lockedRes.error) console.error(lockedRes.error);
+
+        return {
+            questions: questionsRes.data ?? [],
+            lockedIds: lockedRes.error ? [] : (lockedRes.data ?? []),
+        };
+    }, []);
+
+    const questions = data?.questions ?? [];
+    const lockedIds = data?.lockedIds ?? [];
 
     async function handleDelete(id) {
-        const { data, error } = await supabase
-            .from("questions")
-            .delete()
-            .eq("id", id)
-            .select();
+        const { data: deleted, error: deleteError } = await safe(
+            supabase.from("questions").delete().eq("id", id).select(),
+            20000
+        );
 
+        if (deleteError) {
+            notifyError(deleteError, "Could not delete");
+            return;
+        }
         // RLS can block a delete without an error, so check a row was really removed
-        if (error || !data || data.length === 0) {
+        if (!deleted || deleted.length === 0) {
             toast.error("This question is used in a submitted or approved exam and can't be deleted.");
-            if (error) console.error(error);
             return;
         }
 
-        setQuestions((prev) => prev.filter((q) => q.id !== id));
+        setData((prev) => ({ ...prev, questions: prev.questions.filter((q) => q.id !== id) }));
         toast.success("Question has been deleted");
     }
 
@@ -110,6 +114,8 @@ export default function QuestionBank() {
             <div className="mt-6 space-y-3">
                 {loading ? (
                     <SectionLoader />
+                ) : error ? (
+                    <ErrorState compact title="Couldn't load your questions" message={error} onRetry={reload} />
                 ) : filteredQuestions.length === 0 ? (
                     <p className="text-sm text-muted">
                         {questions.length === 0 ? "No questions yet — create your first one." : "No questions match your search."}

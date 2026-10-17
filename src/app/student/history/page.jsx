@@ -1,9 +1,10 @@
 "use client"
-import { useState, useEffect } from "react"
 import Link from "next/link"
-import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { PageLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
+import { useLoader } from "@/lib/useLoader"
+import { ensure } from "@/lib/net"
 
 function duration(a) {
     if (!a.submitted_at) return "—";
@@ -13,23 +14,15 @@ function duration(a) {
 }
 
 export default function HistoryPage() {
-    const [attempts, setAttempts] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        async function load() {
-            const { data, error } = await supabase.rpc("my_attempts");
-            if (error) {
-                toast.error(`Could not load history: ${error.message}`);
-            } else {
-                setAttempts(data ?? []);
-            }
-            setLoading(false);
-        }
-        load();
+    const { data, error, loading, reload } = useLoader(async () => {
+        const { data } = ensure(await supabase.rpc("my_attempts"));
+        return data ?? [];
     }, []);
 
     if (loading) return <PageLoader />;
+    if (error) return <ErrorState message={error} onRetry={reload} />;
+
+    const attempts = data ?? [];
 
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">

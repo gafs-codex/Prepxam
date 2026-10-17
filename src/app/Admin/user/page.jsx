@@ -1,9 +1,13 @@
 "use client"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { toast } from "sonner"
-import { Check, X, RotateCcw } from "lucide-react"
+import { Check, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { PageLoader, SectionLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
+import { friendlyMessage, notifyError, safe, withTimeout } from "@/lib/net"
+
+
 const ROLES = [
     { key: "student", label: "Students" },
     { key: "teacher", label: "Teachers" },
@@ -23,54 +27,72 @@ export default function AdminUsers() {
     const [activeRole, setActiveRole] = useState("student");
     const [activeStatus, setActiveStatus] = useState("pending");
     const [counts, setCounts] = useState(null); // { student: { pending, approved, rejected }, teacher: {...} }
-    const [users, setUsers] = useState(null);
+    const [countsError, setCountsError] = useState(null);
+    const [users, setUsers] = useState([]);
+    const [listError, setListError] = useState(null);
     const [loadingList, setLoadingList] = useState(true);
     const [actingOnId, setActingOnId] = useState(null);
+    const latestRequest = useRef(0);
 
     const loadCounts = useCallback(async () => {
-        const queries = [];
-        for (const role of ROLES) {
-            for (const status of STATUSES) {
-                queries.push(
-                    supabase
-                        .from("profiles")
-                        .select("*", { count: "exact", head: true })
-                        .eq("role", role.key)
-                        .eq("status", status.key)
-                );
+        try {
+            const queries = [];
+            for (const role of ROLES) {
+                for (const status of STATUSES) {
+                    queries.push(
+                        supabase
+                            .from("profiles")
+                            .select("*", { count: "exact", head: true })
+                            .eq("role", role.key)
+                            .eq("status", status.key)
+                    );
+                }
             }
-        }
 
-        const results = await Promise.all(queries);
+            const results = await withTimeout(Promise.all(queries), 15000);
+            const failed = results.find((r) => r.error);
+            if (failed) throw failed.error;
 
-        const next = {};
-        let i = 0;
-        for (const role of ROLES) {
-            next[role.key] = {};
-            for (const status of STATUSES) {
-                next[role.key][status.key] = results[i].count ?? 0;
-                i++;
+            const next = {};
+            let i = 0;
+            for (const role of ROLES) {
+                next[role.key] = {};
+                for (const status of STATUSES) {
+                    next[role.key][status.key] = results[i].count ?? 0;
+                    i++;
+                }
             }
+            setCounts(next);
+            setCountsError(null);
+        } catch (err) {
+            console.error(err);
+            setCountsError(friendlyMessage(err));
         }
-        setCounts(next);
     }, []);
 
     const loadUsers = useCallback(async (role, status) => {
+        const request = ++latestRequest.current;
         setLoadingList(true);
+        setListError(null);
 
-        const { data, error } = await supabase
-            .from("profiles")
-            .select("id, full_name, email, role, status, created_at")
-            .eq("role", role)
-            .eq("status", status)
-            .order("created_at", { ascending: false });
+        const { data, error } = await safe(
+            supabase
+                .from("profiles")
+                .select("id, full_name, email, role, status, created_at")
+                .eq("role", role)
+                .eq("status", status)
+                .order("created_at", { ascending: false })
+        );
+
+        // a newer tab was opened while this was loading, so ignore this answer
+        if (request !== latestRequest.current) return;
 
         if (error) {
-            toast.error("Could not load users");
             console.error(error);
+            setListError(friendlyMessage(error));
             setUsers([]);
         } else {
-            setUsers(data);
+            setUsers(data ?? []);
         }
         setLoadingList(false);
     }, []);
@@ -86,16 +108,19 @@ export default function AdminUsers() {
     async function handleDecision(userId, newStatus) {
         setActingOnId(userId);
 
-        const { error } = await supabase
-            .from("profiles")
-            .update({ status: newStatus })
-            .eq("id", userId);
+        const { data, error } = await safe(
+            supabase.from("profiles").update({ status: newStatus }).eq("id", userId).select("id"),
+            20000
+        );
 
         setActingOnId(null);
 
         if (error) {
-            toast.error("Could not update this user");
-            console.error(error);
+            notifyError(error, "Could not update this user");
+            return;
+        }
+        if (!data || data.length === 0) {
+            toast.error("That change wasn't allowed.");
             return;
         }
 
@@ -109,7 +134,12 @@ export default function AdminUsers() {
         loadCounts();
     }
 
-    if (counts === null) return <PageLoader />;
+    if (counts === null) {
+        return countsError
+            ? <ErrorState message={countsError} onRetry={() => { setCountsError(null); loadCounts(); }} />
+            : <PageLoader />;
+    }
+
 
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -159,6 +189,8 @@ export default function AdminUsers() {
             <div className="mt-6">
                 {loadingList ? (
                     <SectionLoader />
+                ) : listError ? (
+                    <ErrorState compact title="Couldn't load these users" message={listError} onRetry={() => loadUsers(activeRole, activeStatus)} />
                 ) : users.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-border p-16 text-center text-sm text-muted bg-white">
                         No {activeStatus} {activeRole}s.

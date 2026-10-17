@@ -37,5 +37,5 @@ export function useLoader(loader, deps = []) {
         return () => window.removeEventListener("online", retry)
     }, [error])
 
-    return { data, error, loading, reload: () => setTick((t) => t + 1) }
+    return { data, setData, error, loading, reload: () => setTick((t) => t + 1) }
 }

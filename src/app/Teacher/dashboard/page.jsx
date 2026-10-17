@@ -1,12 +1,13 @@
 "use client"
-import { useState, useEffect } from "react";
-import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { Plus } from 'lucide-react';
-import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { PageLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
 import StatCard from "@/components/ui/StatCard";
+import { useLoader } from "@/lib/useLoader"
+import { ensure } from "@/lib/net"
 
 const STATUS_STYLES = {
     draft: { label: "Draft", className: "bg-accent" },
@@ -16,59 +17,50 @@ const STATUS_STYLES = {
 };
 
 export default function TeacherDashboard() {
-    const { profile, loading } = useAuth();
-    const [stats, setStats] = useState({ exams: 0, questions: 0, students: 0, average: "0%" });
-    const [recentExams, setRecentExams] = useState([]);
-    const [activity, setActivity] = useState([]);
-    const [dataLoading, setDataLoading] = useState(true);
+    const { profile, loading: authLoading } = useAuth();
 
-    useEffect(() => {
-        async function load() {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+    const { data, error, loading, reload } = useLoader(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("Your session has expired. Please log in again.");
+        const userId = session.user.id;
 
-            const [examCount, questionCount, recent, rejected] = await Promise.all([
-                supabase.from("exams").select("*", { count: "exact", head: true }).eq("created_by", user.id),
-                supabase.from("questions").select("*", { count: "exact", head: true }).eq("created_by", user.id),
-                supabase.from("exams")
-                    .select("*, exam_questions(count)")
-                    .eq("created_by", user.id)
-                    .order("created_at", { ascending: false })
-                    .limit(3),
-                // exams where the admin has made a decision, newest first
-                supabase.from("exams")
-                    .select("id, title, status, review_note, submitted_at, created_at")
-                    .eq("created_by", user.id)
-                    .in("status", ["pending", "approved", "rejected"])
-                    .order("submitted_at", { ascending: false, nullsFirst: false })
-                    .limit(5),
-            ]);
+        const [examCount, questionCount, recent, decisions] = await Promise.all([
+            supabase.from("exams").select("*", { count: "exact", head: true }).eq("created_by", userId),
+            supabase.from("questions").select("*", { count: "exact", head: true }).eq("created_by", userId),
+            supabase.from("exams")
+                .select("*, exam_questions(count)")
+                .eq("created_by", userId)
+                .order("created_at", { ascending: false })
+                .limit(3),
+            supabase.from("exams")
+                .select("id, title, status, review_note, submitted_at, created_at")
+                .eq("created_by", userId)
+                .in("status", ["pending", "approved", "rejected"])
+                .order("submitted_at", { ascending: false, nullsFirst: false })
+                .limit(5),
+        ]);
 
-            if (examCount.error || questionCount.error || recent.error || rejected.error) {
-                toast.error("Could not load some dashboard data");
-                console.error(examCount.error, questionCount.error, recent.error, rejected.error);
-            }
+        ensure(examCount);
+        ensure(questionCount);
+        ensure(recent);
+        ensure(decisions);
 
-            setStats({
-                exams: examCount.count ?? 0,
-                questions: questionCount.count ?? 0,
-                students: 0,     // TODO: count distinct students from attempts once that table exists
-                average: "0%",   // TODO: average of attempt scores on this teacher's exams
-            });
-            setRecentExams(recent.data ?? []);
-            setActivity(rejected.data ?? []);
-            setDataLoading(false);
-        }
-        load();
+        return {
+            exams: examCount.count ?? 0,
+            questions: questionCount.count ?? 0,
+            recentExams: recent.data ?? [],
+            activity: decisions.data ?? [],
+        };
     }, []);
 
-    if (loading || dataLoading) return <PageLoader />;
+    if (authLoading || loading) return <PageLoader />;
+    if (error) return <ErrorState message={error} onRetry={reload} />;
 
     const statCards = [
-        { label: "Exams Created", value: stats.exams },
-        { label: "Questions in Bank", value: stats.questions },
-        { label: "No of students", value: stats.students },
-        { label: "Average Score", value: stats.average },
+        { label: "Exams Created", value: data.exams },
+        { label: "Questions in Bank", value: data.questions },
+        { label: "No of students", value: 0 },   // TODO: from released results
+        { label: "Average Score", value: "0%" }, // TODO: from released results
     ];
 
     return (
@@ -102,10 +94,10 @@ export default function TeacherDashboard() {
                 </div>
 
                 <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {recentExams.length === 0 ? (
+                    {data.recentExams.length === 0 ? (
                         <p className="text-sm text-muted">No exams yet — create your first one.</p>
                     ) : (
-                        recentExams.map((exam) => {
+                        data.recentExams.map((exam) => {
                             const added = exam.exam_questions?.[0]?.count ?? 0;
                             const status = STATUS_STYLES[exam.status] ?? STATUS_STYLES.draft;
                             return (
@@ -135,10 +127,10 @@ export default function TeacherDashboard() {
                 <h2 className="text-lg font-semibold">Recent activity</h2>
 
                 <div className="mt-4 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
-                    {activity.length === 0 ? (
+                    {data.activity.length === 0 ? (
                         <p className="p-4 text-sm text-muted">No activity yet.</p>
                     ) : (
-                        activity.map((item) => (
+                        data.activity.map((item) => (
                             <Link
                                 key={item.id}
                                 href={`/Teacher/exams/${item.id}/review`}

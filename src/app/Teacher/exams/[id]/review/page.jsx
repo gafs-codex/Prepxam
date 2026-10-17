@@ -1,88 +1,109 @@
 "use client"
 import Link from "next/link"
-import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { ArrowUp, ArrowDown, Pencil, X, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { PageLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
+import { useLoader } from "@/lib/useLoader"
+import { ensure, safe, notifyError } from "@/lib/net"
 
 export default function ReviewExam() {
     const { id } = useParams();
-    const [exam, setExam] = useState(null);
-    const [questions, setQuestions] = useState([]);
-    const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function load() {
-            const { data: examData, error } = await supabase
-                .from("exams").select("*").eq("id", id).single();
-            if (error) {
-                toast.error("Could not load exam");
-                setLoading(false);
-                return;
-            }
-            setExam(examData);
+    const { data, setData, error, loading, reload } = useLoader(async () => {
+        const examRes = ensure(await supabase.from("exams").select("*").eq("id", id).maybeSingle());
+        if (!examRes.data) return { exam: null, questions: [] };
 
-            const { data: links, error: linkError } = await supabase
+        const { data: links } = ensure(
+            await supabase
                 .from("exam_questions")
                 .select("position, created_at, questions(*)")
                 .eq("exam_id", id)
                 .order("position")
-                .order("created_at");
+                .order("created_at")
+        );
 
-            if (linkError) toast.error("Could not load questions");
-            else setQuestions(links.map((l) => l.questions).filter(Boolean));
-            setLoading(false);
-        }
-        load();
+        return {
+            exam: examRes.data,
+            questions: (links ?? []).map((l) => l.questions).filter(Boolean),
+        };
     }, [id]);
 
+    const exam = data?.exam;
+    const questions = data?.questions ?? [];
+
+    // returns true when every row saved
     async function savePositions(list) {
         const results = await Promise.all(
             list.map((q, i) =>
-                supabase.from("exam_questions")
-                    .update({ position: i })
-                    .eq("exam_id", id)
-                    .eq("question_id", q.id)
-                    .select()
+                safe(
+                    supabase.from("exam_questions")
+                        .update({ position: i })
+                        .eq("exam_id", id)
+                        .eq("question_id", q.id)
+                        .select(),
+                    20000
+                )
             )
         );
-        if (results.some((r) => r.error || !r.data || r.data.length === 0)) {
-            toast.error("Could not save the new order. The exam may be locked.");
+        const failed = results.find((r) => r.error || !r.data || r.data.length === 0);
+        if (failed) {
+            if (failed.error) notifyError(failed.error, "Could not save the new order");
+            else toast.error("Could not save the new order. The exam may be locked.");
+            return false;
         }
+        return true;
     }
 
-    function move(index, direction) {
+    async function move(index, direction) {
         const target = index + direction;
         if (target < 0 || target >= questions.length) return;
         const next = [...questions];
         [next[index], next[target]] = [next[target], next[index]];
-        setQuestions(next);
-        savePositions(next);
+        setData((prev) => ({ ...prev, questions: next }));
+
+        const ok = await savePositions(next);
+        if (!ok) reload();   // show the order the database really has
     }
 
     async function removeQuestion(questionId) {
-        const { data, error } = await supabase
-            .from("exam_questions")
-            .delete()
-            .eq("exam_id", id)
-            .eq("question_id", questionId)
-            .select();
+        const { data: removed, error: removeError } = await safe(
+            supabase
+                .from("exam_questions")
+                .delete()
+                .eq("exam_id", id)
+                .eq("question_id", questionId)
+                .select(),
+            20000
+        );
 
-        if (error || !data || data.length === 0) {
-            toast.error("Could not remove it. The exam may be locked.");
-            if (error) console.error(error);
+        if (removeError) {
+            notifyError(removeError, "Could not remove it");
             return;
         }
+        if (!removed || removed.length === 0) {
+            toast.error("Could not remove it. The exam may be locked.");
+            return;
+        }
+
         const next = questions.filter((q) => q.id !== questionId);
-        setQuestions(next);
-        savePositions(next);
+        setData((prev) => ({ ...prev, questions: next }));
         toast.success("Removed from exam");
+        savePositions(next);
     }
 
     if (loading) return <PageLoader />;
-    if (!exam) return <main className="p-8">Exam not found.</main>;
+    if (error) return <ErrorState message={error} onRetry={reload} />;
+    if (!exam) {
+        return (
+            <main className="mx-auto max-w-2xl px-4 py-12 text-center">
+                <p>This exam doesn't exist or isn't yours.</p>
+                <Link href="/Teacher/exams" className="mt-4 inline-block text-primary hover:underline">Back to my exams</Link>
+            </main>
+        );
+    }
 
     const locked = exam.status === "pending" || exam.status === "approved";
     const iconBtn = "inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer";

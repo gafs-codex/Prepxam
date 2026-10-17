@@ -1,9 +1,10 @@
 "use client"
 import { useState, useEffect } from "react"
-import { toast } from "sonner"
 import { Search } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { SectionLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
+import { friendlyMessage, withTimeout } from "@/lib/net"
 import { auditAction, auditOn, auditDetail } from "@/components/AuditEventText"
 
 const PAGE_SIZE = 25;
@@ -31,6 +32,8 @@ export default function AuditLog() {
     const [search, setSearch] = useState("");
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
+    const [reloadKey, setReloadKey] = useState(0);
 
     // wait a moment after typing before searching
     useEffect(() => {
@@ -46,38 +49,42 @@ export default function AuditLog() {
 
         async function load() {
             setLoading(true);
+            setLoadError(null);
 
-            let request = supabase
-                .from("audit_log")
-                .select("*", { count: "exact" })
-                .order("created_at", { ascending: false })
-                .order("id", { ascending: false })
-                .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+            try {
+                let request = supabase
+                    .from("audit_log")
+                    .select("*", { count: "exact" })
+                    .order("created_at", { ascending: false })
+                    .order("id", { ascending: false })
+                    .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
-            const prefix = FILTERS.find((f) => f.key === filter)?.prefix;
-            if (prefix) request = request.like("action", `${prefix}%`);
+                const prefix = FILTERS.find((f) => f.key === filter)?.prefix;
+                if (prefix) request = request.like("action", `${prefix}%`);
 
-            const term = query.replace(/[%,()*]/g, " ").trim();
-            if (term) request = request.or(`actor_name.ilike.%${term}%,target_label.ilike.%${term}%`);
+                const term = query.replace(/[%,()*]/g, " ").trim();
+                if (term) request = request.or(`actor_name.ilike.%${term}%,target_label.ilike.%${term}%`);
 
-            const { data, error, count } = await request;
-            if (cancelled) return;
+                const { data, error, count } = await withTimeout(request, 15000);
+                if (error) throw error;
+                if (cancelled) return;
 
-            if (error) {
-                toast.error(`Could not load the audit log: ${error.message}`);
-                console.error(error);
-                setEvents([]);
-                setTotal(0);
-            } else {
                 setEvents(data ?? []);
                 setTotal(count ?? 0);
+            } catch (err) {
+                console.error(err);
+                if (cancelled) return;
+                setLoadError(friendlyMessage(err));
+                setEvents([]);
+                setTotal(0);
+            } finally {
+                if (!cancelled) setLoading(false);
             }
-            setLoading(false);
         }
 
         load();
         return () => { cancelled = true; };
-    }, [page, filter, query]);
+    }, [page, filter, query, reloadKey]);
 
     const from = total === 0 ? 0 : page * PAGE_SIZE + 1;
     const to = Math.min((page + 1) * PAGE_SIZE, total);
@@ -122,6 +129,13 @@ export default function AuditLog() {
             <div className="mt-6 min-h-[24rem] overflow-x-auto rounded-xl border border-border bg-card">
                 {loading ? (
                     <SectionLoader />
+                ) : loadError ? (
+                    <ErrorState
+                        compact
+                        title="Couldn't load the audit log"
+                        message={loadError}
+                        onRetry={() => setReloadKey((k) => k + 1)}
+                    />
                 ) : events.length === 0 ? (
                     <p className="p-10 text-center text-sm text-muted">
                         {query || filter !== "all" ? "No entries match your search." : "Nothing has been recorded yet."}

@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
+import { friendlyMessage, notifyError, safe } from "@/lib/net"
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -9,32 +10,54 @@ import {
 
 export default function ResultsPanel({ exam, onChange }) {
     const [progress, setProgress] = useState(null);
+    const [progressError, setProgressError] = useState(null);
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
 
     async function loadProgress() {
-        const { data, error } = await supabase.rpc("exam_progress", { p_exam_id: exam.id });
-        if (error) toast.error(`Could not load progress: ${error.message}`);
-        else setProgress(data);
+        setProgressError(null);
+        const { data, error } = await safe(supabase.rpc("exam_progress", { p_exam_id: exam.id }));
+        if (error) {
+            console.error(error);
+            setProgressError(friendlyMessage(error));
+            return;
+        }
+        setProgress(data);
     }
 
     useEffect(() => { loadProgress(); /* eslint-disable-next-line */ }, [exam.id]);
 
     async function toggleImmediate(checked) {
-        const { data, error } = await supabase
-            .from("exams")
-            .update({ results_visibility: checked ? "immediate" : "after_release" })
-            .eq("id", exam.id).select().single();
-        if (error) { toast.error(error.message); return; }
+        const { data, error } = await safe(
+            supabase
+                .from("exams")
+                .update({ results_visibility: checked ? "immediate" : "after_release" })
+                .eq("id", exam.id)
+                .select()
+                .single(),
+            20000
+        );
+        if (error) {
+            notifyError(error, "Could not change the setting");
+            return;
+        }
         onChange(data);
     }
 
     async function release() {
         setBusy(true);
-        const { error } = await supabase.rpc("release_results", { p_exam_id: exam.id });
-        if (error) { setBusy(false); toast.error(error.message); return; }
-        const { data } = await supabase.from("exams").select("*").eq("id", exam.id).single();
-        if (data) onChange(data);
+        const { error } = await safe(supabase.rpc("release_results", { p_exam_id: exam.id }), 30000);
+
+        if (error) {
+            setBusy(false);
+            notifyError(error, "Results were not released");
+            return;
+        }
+
+        // the release worked. If we can't re-read the exam, update it here.
+        const { data } = await safe(supabase.from("exams").select("*").eq("id", exam.id).single());
+        onChange(data ?? { ...exam, results_released: true });
+
         await loadProgress();
         setBusy(false);
         toast.success("Results released");
@@ -50,6 +73,15 @@ export default function ResultsPanel({ exam, onChange }) {
                 <p className="mt-2 text-sm text-muted">
                     {progress.submitted} of {progress.students} students have submitted
                     · {progress.in_progress} in progress · {progress.not_started} not started
+                </p>
+            )}
+
+            {progressError && (
+                <p className="mt-2 text-sm text-red-600">
+                    Couldn't check student progress: {progressError}{" "}
+                    <button type="button" onClick={loadProgress} className="font-medium underline cursor-pointer">
+                        Try again
+                    </button>
                 </p>
             )}
 
@@ -86,7 +118,7 @@ export default function ResultsPanel({ exam, onChange }) {
                             disabled={busy || !progress}
                             className="h-9 shrink-0 rounded-md bg-primary px-4 text-sm font-medium text-white cursor-pointer disabled:opacity-60"
                         >
-                            Release
+                            {busy ? "Releasing..." : "Release"}
                         </button>
                     )}
                 </div>

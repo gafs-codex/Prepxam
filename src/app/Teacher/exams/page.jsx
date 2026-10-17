@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -14,8 +14,10 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { supabase } from "@/lib/supabase";
-import { PageLoader } from "@/components/ui/Spinner"
 import { SectionLoader } from "@/components/ui/Spinner";
+import ErrorState from "@/components/ui/ErrorState";
+import { useLoader } from "@/lib/useLoader";
+import { ensure, safe, notifyError } from "@/lib/net";
 
 const STATUS_STYLES = {
     draft: { label: "Draft", className: "bg-accent" },
@@ -25,33 +27,25 @@ const STATUS_STYLES = {
 };
 
 export default function TeacherExam() {
-    const [exams, setExams] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [busyId, setBusyId] = useState(null);
     // which dialog is open: { type: "publish" | "withdraw" | "delete", exam }
     const [dialog, setDialog] = useState(null);
 
-    useEffect(() => {
-        async function loadExams() {
-            const { data, error } = await supabase
+    const { data, setData, error, loading, reload } = useLoader(async () => {
+        const { data } = ensure(
+            await supabase
                 .from("exams")
                 .select("*, exam_questions(count)")
-                .order("created_at", { ascending: false });
-
-            if (error) {
-                toast.error(`Could not load exams: ${error.message}`);
-                console.error(error);
-            } else {
-                setExams(data);
-            }
-            setLoading(false);
-        }
-        loadExams();
+                .order("created_at", { ascending: false })
+        );
+        return data ?? [];
     }, []);
 
+    const exams = data ?? [];
+
     function updateLocal(id, changes) {
-        setExams((prev) => prev.map((e) => (e.id === id ? { ...e, ...changes } : e)));
+        setData((prev) => (prev ?? []).map((e) => (e.id === id ? { ...e, ...changes } : e)));
     }
 
     // Check first, then open the dialog only if publishing is possible
@@ -65,61 +59,64 @@ export default function TeacherExam() {
 
     async function publishExam(exam) {
         setBusyId(exam.id);
-        const { data, error } = await supabase
-            .from("exams")
-            .update({ status: "pending", submitted_at: new Date().toISOString(), review_note: null })
-            .eq("id", exam.id)
-            .select()
-            .single();
+        const { data: updated, error } = await safe(
+            supabase
+                .from("exams")
+                .update({ status: "pending", submitted_at: new Date().toISOString(), review_note: null })
+                .eq("id", exam.id)
+                .select()
+                .single(),
+            20000
+        );
         setBusyId(null);
 
         if (error) {
-            toast.error(`Could not publish: ${error.message}`);
-            console.error(error);
+            notifyError(error, "Could not publish");
             return;
         }
-        updateLocal(exam.id, data);
+        updateLocal(exam.id, updated);
         toast.success("Sent for approval");
     }
 
     async function withdrawExam(exam) {
         setBusyId(exam.id);
-        const { data, error } = await supabase
-            .from("exams")
-            .update({ status: "draft" })
-            .eq("id", exam.id)
-            .select()
-            .single();
+        const { data: updated, error } = await safe(
+            supabase
+                .from("exams")
+                .update({ status: "draft" })
+                .eq("id", exam.id)
+                .select()
+                .single(),
+            20000
+        );
         setBusyId(null);
 
         if (error) {
-            toast.error(`Could not withdraw: ${error.message}`);
-            console.error(error);
+            notifyError(error, "Could not withdraw");
             return;
         }
-        updateLocal(exam.id, data);
+        updateLocal(exam.id, updated);
         toast.success("Exam withdrawn. It's a draft again.");
     }
 
     async function deleteExam(exam) {
         setBusyId(exam.id);
-        const { data, error } = await supabase
-            .from("exams")
-            .delete()
-            .eq("id", exam.id)
-            .select();
+        const { data: deleted, error } = await safe(
+            supabase.from("exams").delete().eq("id", exam.id).select(),
+            20000
+        );
         setBusyId(null);
 
         if (error) {
-            toast.error(`Could not delete: ${error.message}`);
+            notifyError(error, "Could not delete");
             return;
         }
         // RLS can block a delete without raising an error, so check a row really went
-        if (!data || data.length === 0) {
+        if (!deleted || deleted.length === 0) {
             toast.error("This exam can't be deleted right now.");
             return;
         }
-        setExams((prev) => prev.filter((e) => e.id !== exam.id));
+        setData((prev) => (prev ?? []).filter((e) => e.id !== exam.id));
         toast.success("Exam deleted");
     }
 
@@ -183,8 +180,9 @@ export default function TeacherExam() {
 
             <div className="mt-6 space-y-3">
                 {loading ? (
-                    // <PageLoader />
                     <SectionLoader />
+                ) : error ? (
+                    <ErrorState compact title="Couldn't load your exams" message={error} onRetry={reload} />
                 ) : visibleExams.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted bg-white">
                         {exams.length === 0 ? "No exams yet." : "No exams match your search."}

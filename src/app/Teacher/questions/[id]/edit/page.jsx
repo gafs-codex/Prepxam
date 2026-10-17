@@ -1,15 +1,17 @@
 "use client"
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-import { toast } from "sonner";
-import { PageLoader } from "@/components/ui/Spinner"
 import Link from "next/link";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { PageLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
+import { useLoader } from "@/lib/useLoader";
+import { ensure, safe, notifyError } from "@/lib/net";
 
 export default function EditQuestion() {
     const { id } = useParams();
     const router = useRouter();
-    const [loading, setLoading] = useState(true);
     const [locked, setLocked] = useState(false);
     const [saving, setSaving] = useState(false);
     const [questionText, setQuestionText] = useState("");
@@ -17,30 +19,32 @@ export default function EditQuestion() {
     const [correctIndex, setCorrectIndex] = useState(null);
     const [explanation, setExplanation] = useState("");
 
-    useEffect(() => {
-        async function loadQuestion() {
-            const [questionRes, lockedRes] = await Promise.all([
-                supabase.from("questions").select("*").eq("id", id).single(),
-                supabase.rpc("locked_question_ids"),
-            ]);
+    const { data, error, loading, reload } = useLoader(async () => {
+        const [questionRes, lockedRes] = await Promise.all([
+            supabase.from("questions").select("*").eq("id", id).maybeSingle(),
+            supabase.rpc("locked_question_ids"),
+        ]);
 
-            if (questionRes.error) {
-                toast.error("Could not load question");
-                setLoading(false);
-                return;
-            }
+        ensure(questionRes);
+        // the lock notice is a nicety. The database still blocks the save if this fails.
+        if (lockedRes.error) console.error(lockedRes.error);
 
-            const data = questionRes.data;
-            setQuestionText(data.question_text);
-            setOptions(data.options);
-            setCorrectIndex(data.correct_index);
-            setExplanation(data.explanation || "");
-            setLocked((lockedRes.data ?? []).includes(id));
-            setLoading(false);
-        }
-
-        loadQuestion();
+        return {
+            question: questionRes.data,
+            locked: lockedRes.error ? false : (lockedRes.data ?? []).includes(id),
+        };
     }, [id]);
+
+    // fill the form once the question has loaded
+    useEffect(() => {
+        if (!data?.question) return;
+        const q = data.question;
+        setQuestionText(q.question_text);
+        setOptions(q.options ?? ["", "", "", ""]);
+        setCorrectIndex(q.correct_index);
+        setExplanation(q.explanation || "");
+        setLocked(data.locked);
+    }, [data]);
 
     function updateOption(index, value) {
         setOptions((prev) => {
@@ -52,7 +56,7 @@ export default function EditQuestion() {
 
     async function handleSubmit(e) {
         e.preventDefault();
-        if (locked) return;
+        if (locked || saving) return;
 
         if (questionText.trim() === "") {
             toast.error("Question field cannot be empty");
@@ -68,22 +72,28 @@ export default function EditQuestion() {
         }
 
         setSaving(true);
-        const { data, error } = await supabase
-            .from("questions")
-            .update({
-                question_text: questionText,
-                options: options,
-                correct_index: correctIndex,
-                explanation: explanation,
-            })
-            .eq("id", id)
-            .select();
+        const { data: saved, error: saveError } = await safe(
+            supabase
+                .from("questions")
+                .update({
+                    question_text: questionText,
+                    options: options,
+                    correct_index: correctIndex,
+                    explanation: explanation,
+                })
+                .eq("id", id)
+                .select(),
+            20000
+        );
         setSaving(false);
 
+        if (saveError) {
+            notifyError(saveError, "Failed to save");
+            return;
+        }
         // RLS can block an update without an error, so check a row really changed
-        if (error || !data || data.length === 0) {
+        if (!saved || saved.length === 0) {
             toast.error("This question is used in a submitted or approved exam and can't be changed.");
-            if (error) console.error(error);
             setLocked(true);
             return;
         }
@@ -92,7 +102,16 @@ export default function EditQuestion() {
         router.push("/Teacher/questions");
     }
 
-    if (loading) return <PageLoader />
+    if (loading) return <PageLoader />;
+    if (error) return <ErrorState message={error} onRetry={reload} />;
+    if (!data?.question) {
+        return (
+            <main className="mx-auto max-w-2xl px-4 py-12 text-center">
+                <p>This question doesn't exist or isn't yours.</p>
+                <Link href="/Teacher/questions" className="mt-4 inline-block text-primary hover:underline">Back to question bank</Link>
+            </main>
+        );
+    }
 
     const inputDisabled = "disabled:opacity-60 disabled:cursor-not-allowed";
 

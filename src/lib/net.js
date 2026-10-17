@@ -23,6 +23,9 @@ export function friendlyMessage(error) {
     if (text.includes("row-level security") || text.includes("permission denied")) {
         return "You don't have permission to do that."
     }
+    if (error?.code === "PGRST116" || text.includes("cannot coerce") || text.includes("multiple (or no) rows")) {
+        return "That change wasn't allowed. The item may be locked or may no longer exist."
+    }
     return error?.message || "Something went wrong. Please try again."
 }
 
@@ -44,4 +47,13 @@ export function withTimeout(promise, ms = 15000) {
 export function ensure(result) {
     if (result?.error) throw result.error
     return result
+}
+
+// Runs a Supabase call and never throws. Always gives you { data, error }.
+export async function safe(promise, ms = 15000) {
+    try {
+        return await withTimeout(promise, ms)
+    } catch (error) {
+        return { data: null, error }
+    }
 }

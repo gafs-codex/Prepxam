@@ -1,12 +1,12 @@
 import { TriangleAlert } from "lucide-react"
 
-export default function ErrorState({ message, onRetry }) {
+export default function ErrorState({ message, onRetry, title = "Couldn't load this page", compact = false }) {
     return (
-        <div className="flex min-h-[40vh] flex-col items-center justify-center px-4 py-10 text-center">
+        <div className={`flex flex-col items-center justify-center px-4 text-center ${compact ? "py-10" : "min-h-[40vh] py-10"}`}>
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100 text-yellow-700">
                 <TriangleAlert size={24} />
             </span>
-            <h2 className="mt-4 text-lg font-semibold">Couldn't load this page</h2>
+            <h2 className="mt-4 text-lg font-semibold">{title}</h2>
             <p className="mt-1 max-w-sm text-sm text-muted">{message}</p>
             {onRetry && (
                 <button

@@ -1,10 +1,12 @@
 "use client"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { toast } from "sonner"
 import { Search, Eye, EyeOff } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { PageLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
 import { apiPost } from "@/lib/api"
+import { friendlyMessage, notifyError, safe } from "@/lib/net"
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -20,8 +22,10 @@ function formatDate(value) {
 
 export default function SuperAdmins() {
     const [admins, setAdmins] = useState(null);
+    const [adminsError, setAdminsError] = useState(null);
     const [myId, setMyId] = useState(null);
     const [search, setSearch] = useState("");
+    const loadedRef = useRef(false);
 
     const [fullName, setFullName] = useState("");
     const [email, setEmail] = useState("");
@@ -33,26 +37,36 @@ export default function SuperAdmins() {
     const [busy, setBusy] = useState(false);
 
     const loadAdmins = useCallback(async () => {
-        const { data, error } = await supabase.rpc("list_admins");
+        const { data, error } = await safe(supabase.rpc("list_admins"));
+
         if (error) {
-            toast.error(`Could not load admins: ${error.message}`);
-            setAdmins([]);
+            console.error(error);
+            // if a list is already on screen, keep it and just say the refresh failed
+            if (loadedRef.current) notifyError(error, "Couldn't refresh the admin list");
+            else setAdminsError(friendlyMessage(error));
             return;
         }
+
+        loadedRef.current = true;
+        setAdminsError(null);
         setAdmins(data ?? []);
     }, []);
 
     useEffect(() => {
         async function start() {
-            const { data: { user } } = await supabase.auth.getUser();
-            setMyId(user?.id ?? null);
+            const { data: { session } } = await supabase.auth.getSession();
+            setMyId(session?.user?.id ?? null);
             await loadAdmins();
         }
-        start();
+        start().catch((err) => {
+            console.error(err);
+            setAdminsError(friendlyMessage(err));
+        });
     }, [loadAdmins]);
 
     async function addAdmin(e) {
         e.preventDefault();
+        if (adding) return;
 
         if (!email.trim() || !email.includes("@")) {
             toast.error("Enter the person's email address");
@@ -83,18 +97,25 @@ export default function SuperAdmins() {
         setBusy(true);
         setRemoving(null);
 
-        const { error } = await supabase.rpc("remove_school_admin", { p_user_id: target.user_id });
+        const { error } = await safe(
+            supabase.rpc("remove_school_admin", { p_user_id: target.user_id }),
+            20000
+        );
         setBusy(false);
 
         if (error) {
-            toast.error(error.message);
+            notifyError(error, "Could not remove the admin");
             return;
         }
         toast.success("School admin removed");
         await loadAdmins();
     }
 
-    if (admins === null) return <PageLoader />;
+    if (admins === null) {
+        return adminsError
+            ? <ErrorState message={adminsError} onRetry={() => { setAdminsError(null); loadAdmins(); }} />
+            : <PageLoader />;
+    }
 
     const visible = admins.filter((a) =>
         `${a.full_name ?? ""} ${a.email ?? ""}`.toLowerCase().includes(search.toLowerCase())

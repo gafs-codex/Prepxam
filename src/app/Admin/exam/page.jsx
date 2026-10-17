@@ -1,10 +1,13 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { findExamProblems } from "@/lib/examChecks"
-import { PageLoader, SectionLoader } from "@/components/ui/Spinner"
+import { SectionLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
+import { useLoader } from "@/lib/useLoader"
+import { ensure, safe, notifyError } from "@/lib/net"
 
 const FILTERS = ["pending", "approved", "rejected", "draft", "all"];
 
@@ -16,41 +19,36 @@ const STATUS_STYLES = {
 };
 
 export default function AdminExams() {
-    const [exams, setExams] = useState([]);
-    const [teachers, setTeachers] = useState({});
-    const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("pending");
     const [search, setSearch] = useState("");
     const [editingId, setEditingId] = useState(null);
     const [editTitle, setEditTitle] = useState("");
     const [editDuration, setEditDuration] = useState("");
 
-    useEffect(() => {
-        async function load() {
-            const { data, error } = await supabase
+    const { data, setData, error, loading, reload } = useLoader(async () => {
+        const { data: examRows } = ensure(
+            await supabase
                 .from("exams")
                 .select("*, exam_questions(position, questions(*))")
-                .order("created_at", { ascending: false });
+                .order("created_at", { ascending: false })
+        );
+        const list = examRows ?? [];
 
-            if (error) {
-                toast.error(`Could not load exams: ${error.message}`);
-                console.error(error);
-                setLoading(false);
-                return;
-            }
-            setExams(data);
-
-            // exams.created_by points to auth users, so fetch teacher names separately
-            const ids = [...new Set(data.map((e) => e.created_by).filter(Boolean))];
-            if (ids.length > 0) {
-                const { data: profiles } = await supabase
-                    .from("profiles").select("id, full_name").in("id", ids);
-                setTeachers(Object.fromEntries((profiles ?? []).map((p) => [p.id, p.full_name])));
-            }
-            setLoading(false);
+        // exams.created_by points to auth users, so fetch teacher names separately
+        const ids = [...new Set(list.map((e) => e.created_by).filter(Boolean))];
+        let teachers = {};
+        if (ids.length > 0) {
+            const { data: profiles } = ensure(
+                await supabase.from("profiles").select("id, full_name").in("id", ids)
+            );
+            teachers = Object.fromEntries((profiles ?? []).map((p) => [p.id, p.full_name]));
         }
-        load();
+
+        return { exams: list, teachers };
     }, []);
+
+    const exams = data?.exams ?? [];
+    const teachers = data?.teachers ?? {};
 
     function startEdit(exam) {
         setEditingId(exam.id);
@@ -69,18 +67,30 @@ export default function AdminExams() {
             return;
         }
 
-        const { error } = await supabase
-            .from("exams")
-            .update({ title: editTitle.trim(), duration_minutes: duration })
-            .eq("id", exam.id);
+        const { data: saved, error: saveError } = await safe(
+            supabase
+                .from("exams")
+                .update({ title: editTitle.trim(), duration_minutes: duration })
+                .eq("id", exam.id)
+                .select("id"),
+            20000
+        );
 
-        if (error) {
-            toast.error(`Could not save: ${error.message}`);
+        if (saveError) {
+            notifyError(saveError, "Could not save");
             return;
         }
-        setExams((prev) => prev.map((e) =>
-            e.id === exam.id ? { ...e, title: editTitle.trim(), duration_minutes: duration } : e
-        ));
+        if (!saved || saved.length === 0) {
+            toast.error("That change wasn't allowed. The exam may already be approved.");
+            return;
+        }
+
+        setData((prev) => ({
+            ...prev,
+            exams: prev.exams.map((e) =>
+                e.id === exam.id ? { ...e, title: editTitle.trim(), duration_minutes: duration } : e
+            ),
+        }));
         setEditingId(null);
         toast.success("Exam updated");
     }
@@ -123,6 +133,8 @@ export default function AdminExams() {
             <div className="mt-6 space-y-3">
                 {loading ? (
                     <SectionLoader />
+                ) : error ? (
+                    <ErrorState compact title="Couldn't load the exams" message={error} onRetry={reload} />
                 ) : visible.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted bg-white">
                         No exams here.

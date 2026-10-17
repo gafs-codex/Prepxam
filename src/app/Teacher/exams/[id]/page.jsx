@@ -1,87 +1,78 @@
 "use client"
 import Link from "next/link"
-import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Library, CirclePlus } from 'lucide-react';
+import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { PageLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
 import CreateQuestionForm from "@/components/CreateQuestionForm";
 import AddFromBank from "@/components/AddFromBank";
+import { useLoader } from "@/lib/useLoader";
+import { ensure, safe, notifyError } from "@/lib/net";
 
 export default function ExamOverview() {
-
     const { id } = useParams();
-    const [exam, setExam] = useState(null);
-    const [loading, setLoading] = useState(true);
     const [activePanel, setActivePanel] = useState("bank");
-    const [examQuestions, setExamQuestions] = useState([]);
 
+    const { data, setData, error, loading, reload } = useLoader(async () => {
+        const examRes = ensure(await supabase.from("exams").select("*").eq("id", id).maybeSingle());
+        if (!examRes.data) return { exam: null, questions: [] };
 
-    useEffect(() => {
-        async function loadExam() {
-            const { data: examData, error } = await supabase
-                .from("exams")
-                .select("*")
-                .eq("id", id)
-                .single();
-
-            if (error) {
-                toast.error("Could not load exam");
-                console.error(error);
-                setLoading(false);
-                return;
-            }
-            setExam(examData);
-
-            const { data: links, error: linkError } = await supabase
+        const { data: links } = ensure(
+            await supabase
                 .from("exam_questions")
                 .select("position, questions(*)")
                 .eq("exam_id", id)
-                .order("position");
+                .order("position")
+        );
 
-            if (linkError) {
-                toast.error("Could not load exam questions");
-                console.error(linkError);
-            } else {
-                setExamQuestions(links.map((l) => l.questions).filter(Boolean));
-            }
-            setLoading(false);
-        }
-        loadExam();
+        return {
+            exam: examRes.data,
+            questions: (links ?? []).map((l) => l.questions).filter(Boolean),
+        };
     }, [id]);
 
     async function addQuestionsToExam(newQuestions) {
-        const existingIds = new Set(examQuestions.map((q) => q.id));
+        const current = data?.questions ?? [];
+        const existingIds = new Set(current.map((q) => q.id));
         const toAdd = newQuestions.filter((q) => !existingIds.has(q.id));
         if (toAdd.length === 0) return;
 
         const rows = toAdd.map((q, i) => ({
             exam_id: id,
             question_id: q.id,
-            position: examQuestions.length + i,
+            position: current.length + i,
         }));
 
-        const { error } = await supabase.from("exam_questions").insert(rows);
-        if (error) {
-            toast.error(`Could not add to exam: ${error.message}`);
-            console.error(error);
+        const { error: insertError } = await safe(supabase.from("exam_questions").insert(rows), 20000);
+        if (insertError) {
+            notifyError(insertError, "Could not add to exam");
             return;
         }
-        setExamQuestions((prev) => [...prev, ...toAdd]);
+        setData((prev) => ({ ...prev, questions: [...prev.questions, ...toAdd] }));
         toast.success(`${toAdd.length} question(s) added`);
     }
 
     if (loading) return <PageLoader />;
-    if (!exam) return <main className="p-8">Exam not found.</main>;
+    if (error) return <ErrorState message={error} onRetry={reload} />;
+    if (!data?.exam) {
+        return (
+            <main className="mx-auto max-w-2xl px-4 py-12 text-center">
+                <p>This exam doesn't exist or isn't yours.</p>
+                <Link href="/Teacher/exams" className="mt-4 inline-block text-primary hover:underline">Back to my exams</Link>
+            </main>
+        );
+    }
 
+    const { exam, questions: examQuestions } = data;
     const totalNeeded = exam.number_of_questions;
+    const locked = exam.status === "pending" || exam.status === "approved";
 
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-            <Link href={``}>
-                Exam overview
-            </Link>
+            <Link href="/Teacher/exams" className="text-sm text-muted">← My exams</Link>
             <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Step 2 of 2 · {exam.exam_type} · {exam.subject}
             </p>
@@ -95,7 +86,7 @@ export default function ExamOverview() {
                         {examQuestions.length} of {totalNeeded} questions added
                     </p>
 
-                    <Link href={`/Teacher/exams/${id}/review`} className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs active cursor-pointer">
+                    <Link href={`/Teacher/exams/${id}/review`} className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-3 text-xs">
                         Done — review exam
                     </Link>
                 </div>
@@ -105,8 +96,6 @@ export default function ExamOverview() {
                     aria-valuenow={examQuestions.length}
                     aria-valuemin="0"
                     role="progressbar"
-                    data-state="indeterminate"
-                    data-max="100"
                     className="relative h-2 w-full overflow-hidden rounded-full bg-primary/20 mt-3"
                 >
                     <div
@@ -116,54 +105,62 @@ export default function ExamOverview() {
                 </div>
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <button
-                    onClick={() => setActivePanel("bank")}
-                    type="button"
-                    className={`flex items-start gap-3 rounded-xl border p-4 text-left transition cursor-pointer ${activePanel === "bank" ? "border-primary bg-accent/40" : "border-border bg-card hover:bg-accent/40"
-                        }`}
-                >
-                    <Library className="text-primary" />
-                    <span>
-                        <span className="block font-medium">Add from question bank</span>
-                        <span className="block text-xs text-muted">Pick existing {exam.subject} · {exam.exam_type} questions</span>
-                    </span>
-                </button>
-
-                <button
-                    onClick={() => setActivePanel("create")}
-                    type="button"
-                    className={`flex items-start gap-3 rounded-xl border p-4 text-left transition cursor-pointer ${activePanel === "create" ? "border-primary bg-accent/40" : "border-border bg-card hover:bg-accent/40"
-                        }`}
-                >
-                    <CirclePlus className="text-primary" width={24} height={24} />
-                    <span>
-                        <span className="block font-medium">Create a new question</span>
-                        <span className="block text-xs text-muted">Pick existing {exam.subject} · {exam.exam_type} questions</span>
-                    </span>
-                </button>
-            </div>
-
-            <div className="mt-6">
-                <div className={activePanel === "create" ? "" : "hidden"}>
-                    <CreateQuestionForm
-                        lockedSubject={exam.subject}
-                        lockedExamType={exam.exam_type}
-                        submitLabel="Save and add to exam"
-                        onQuestionCreated={(question) => addQuestionsToExam([question])}
-                        onCancel={() => setActivePanel("bank")}
-                    />
+            {locked ? (
+                <div className="mt-6 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800">
+                    {exam.status === "pending"
+                        ? "This exam is waiting for admin approval, so questions can't be added. Withdraw it from My exams first to make changes."
+                        : "This exam is approved and published, so questions can't be added."}
                 </div>
+            ) : (
+                <>
+                    <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                        <button
+                            onClick={() => setActivePanel("bank")}
+                            type="button"
+                            className={`flex items-start gap-3 rounded-xl border p-4 text-left transition cursor-pointer ${activePanel === "bank" ? "border-primary bg-accent/40" : "border-border bg-card hover:bg-accent/40"}`}
+                        >
+                            <Library className="text-primary" />
+                            <span>
+                                <span className="block font-medium">Add from question bank</span>
+                                <span className="block text-xs text-muted">Pick existing {exam.subject} · {exam.exam_type} questions</span>
+                            </span>
+                        </button>
 
-                <div className={activePanel === "bank" ? "" : "hidden"}>
-                    <AddFromBank
-                        subject={exam.subject}
-                        examType={exam.exam_type}
-                        addedIds={examQuestions.map((q) => q.id)}
-                        onAddSelected={addQuestionsToExam}
-                    />
-                </div>
-            </div>
+                        <button
+                            onClick={() => setActivePanel("create")}
+                            type="button"
+                            className={`flex items-start gap-3 rounded-xl border p-4 text-left transition cursor-pointer ${activePanel === "create" ? "border-primary bg-accent/40" : "border-border bg-card hover:bg-accent/40"}`}
+                        >
+                            <CirclePlus className="text-primary" width={24} height={24} />
+                            <span>
+                                <span className="block font-medium">Create a new question</span>
+                                <span className="block text-xs text-muted">Write a new {exam.subject} · {exam.exam_type} question</span>
+                            </span>
+                        </button>
+                    </div>
+
+                    <div className="mt-6">
+                        <div className={activePanel === "create" ? "" : "hidden"}>
+                            <CreateQuestionForm
+                                lockedSubject={exam.subject}
+                                lockedExamType={exam.exam_type}
+                                submitLabel="Save and add to exam"
+                                onQuestionCreated={(question) => addQuestionsToExam([question])}
+                                onCancel={() => setActivePanel("bank")}
+                            />
+                        </div>
+
+                        <div className={activePanel === "bank" ? "" : "hidden"}>
+                            <AddFromBank
+                                subject={exam.subject}
+                                examType={exam.exam_type}
+                                addedIds={examQuestions.map((q) => q.id)}
+                                onAddSelected={addQuestionsToExam}
+                            />
+                        </div>
+                    </div>
+                </>
+            )}
         </main>
     )
 }

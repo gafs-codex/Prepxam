@@ -1,10 +1,11 @@
 "use client"
-import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { PageLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
+import { useLoader } from "@/lib/useLoader"
+import { ensure } from "@/lib/net"
 
 function formatDate(value) {
     return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -18,28 +19,26 @@ function duration(r) {
 
 export default function TeacherStudentDetail() {
     const { id } = useParams();
-    const [student, setStudent] = useState(null);
-    const [results, setResults] = useState([]);
-    const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function load() {
-            const [studentsRes, resultsRes] = await Promise.all([
-                supabase.rpc("teacher_students"),
-                supabase.rpc("teacher_student_results", { p_student_id: id }),
-            ]);
+    const { data, error, loading, reload } = useLoader(async () => {
+        const [studentsRes, resultsRes] = await Promise.all([
+            supabase.rpc("teacher_students"),
+            supabase.rpc("teacher_student_results", { p_student_id: id }),
+        ]);
 
-            if (studentsRes.error || resultsRes.error) {
-                toast.error((studentsRes.error ?? resultsRes.error).message);
-            }
-            setStudent((studentsRes.data ?? []).find((s) => s.student_id === id) ?? null);
-            setResults(resultsRes.data ?? []);
-            setLoading(false);
-        }
-        load();
+        ensure(studentsRes);
+        const student = (studentsRes.data ?? []).find((s) => s.student_id === id) ?? null;
+        // not one of this teacher's students: that's "not found", not a failure
+        if (!student) return { student: null, results: [] };
+
+        ensure(resultsRes);
+        return { student, results: resultsRes.data ?? [] };
     }, [id]);
 
     if (loading) return <PageLoader />;
+    if (error) return <ErrorState message={error} onRetry={reload} />;
+
+    const { student, results } = data;
 
     if (!student) {
         return (

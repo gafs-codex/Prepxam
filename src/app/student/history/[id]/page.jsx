@@ -1,27 +1,26 @@
 "use client"
-import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { PageLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
+import { useLoader } from "@/lib/useLoader"
 
 export default function ResultPage() {
     const { id } = useParams();
-    const [result, setResult] = useState(null);
-    const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function load() {
-            const { data, error } = await supabase.rpc("get_result", { p_attempt_id: id });
-            if (error) toast.error(error.message);
-            else setResult(data);
-            setLoading(false);
+    const { data: result, error, loading, reload } = useLoader(async () => {
+        const res = await supabase.rpc("get_result", { p_attempt_id: id });
+        if (res.error) {
+            // a result that doesn't exist (or isn't yours) is "not found", not a failure
+            if (String(res.error.message).toLowerCase().includes("not found")) return null;
+            throw res.error;
         }
-        load();
+        return res.data ?? null;
     }, [id]);
 
     if (loading) return <PageLoader />;
+    if (error) return <ErrorState message={error} onRetry={reload} />;
 
     if (!result) {
         return (

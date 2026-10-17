@@ -1,41 +1,30 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Search } from "lucide-react"
-import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
+import { SectionLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
+import { useLoader } from "@/lib/useLoader"
+import { ensure } from "@/lib/net"
 import { Checkbox } from "./ui/checkbox";
 
-
-
-
-export default function AddFromBank({ onAddSelected,subject, examType, addedIds = [] }) {
-    const [bankQuestions, setBankQuestions] = useState([])
-    const [loading, setLoading] = useState(true)
+export default function AddFromBank({ onAddSelected, subject, examType, addedIds = [] }) {
     const [search, setSearch] = useState("")
     const [selectedIds, setSelectedIds] = useState([])
 
-    useEffect(() => {
-        async function loadQuestions() {
-            setLoading(true)
-
-            const { data, error } = await supabase
+    const { data, error, loading, reload } = useLoader(async () => {
+        if (!subject || !examType) return []
+        const { data } = ensure(
+            await supabase
                 .from("questions")
                 .select("*")
                 .eq("subject", subject)
                 .eq("exam_type", examType)
-
-            if (error) {
-                toast.error(`Could not load questions: ${error.message}`)
-                console.error(error)
-                setBankQuestions([])
-            } else {
-                setBankQuestions(data)
-            }
-            setLoading(false)
-        }
-
-        if (subject && examType) loadQuestions()
+        )
+        return data ?? []
     }, [subject, examType])
+
+    const bankQuestions = data ?? []
 
     const visibleQuestions = bankQuestions.filter((q) =>
         !addedIds.includes(q.id) &&
@@ -49,7 +38,6 @@ export default function AddFromBank({ onAddSelected,subject, examType, addedIds 
     }
 
     function handleAddSelected() {
-        console.log("Adding these question IDs to the exam:", selectedIds);
         const selectedQuestions = bankQuestions.filter((question) => selectedIds.includes(question.id))
         onAddSelected(selectedQuestions)
         setSelectedIds([])
@@ -80,7 +68,9 @@ export default function AddFromBank({ onAddSelected,subject, examType, addedIds 
 
             <div className="mt-4 max-h-[32rem] space-y-2 overflow-y-auto pr-1">
                 {loading ? (
-                    <p className="text-sm text-muted">Loading questions...</p>
+                    <SectionLoader />
+                ) : error ? (
+                    <ErrorState compact title="Couldn't load the question bank" message={error} onRetry={reload} />
                 ) : visibleQuestions.length === 0 ? (
                     <p className="text-sm text-muted">
                         No questions found for {subject} · {examType}.

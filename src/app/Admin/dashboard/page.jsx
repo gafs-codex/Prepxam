@@ -1,12 +1,12 @@
 "use client"
-import { useState, useEffect } from "react"
 import Link from "next/link"
-import { toast } from "sonner"
 import { Users, FileText, BookOpen, ArrowRight, ClipboardCheck, Clock } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { PageLoader } from "@/components/ui/Spinner"
+import ErrorState from "@/components/ui/ErrorState"
+import { useLoader } from "@/lib/useLoader"
+import { ensure } from "@/lib/net"
 
-// change these if your folder names differ (your screenshot showed Admin/exam)
 const USERS_URL = "/Admin/users";
 const EXAMS_URL = "/Admin/exams";
 
@@ -19,83 +19,77 @@ function formatDate(value) {
 }
 
 export default function AdminDashboard() {
-    const [data, setData] = useState(null);
+    const { data, error, loading, reload } = useLoader(async () => {
+        const results = await Promise.all([
+            count(supabase.from("profiles")).eq("role", "student"),
+            count(supabase.from("profiles")).eq("role", "teacher"),
+            count(supabase.from("exams")),
+            count(supabase.from("questions")),
+            count(supabase.from("profiles")).eq("status", "pending"),
+            count(supabase.from("exams")).eq("status", "pending"),
+            count(supabase.from("profiles")).eq("status", "approved"),
+            count(supabase.from("exams")).eq("status", "approved"),
+            count(supabase.from("profiles")),
+            supabase.from("profiles").select("id, full_name, role, created_at")
+                .eq("status", "pending").order("created_at", { ascending: false }).limit(5),
+            supabase.from("exams").select("id, title, subject, created_by, submitted_at")
+                .eq("status", "pending").order("submitted_at", { ascending: false }).limit(5),
+            supabase.from("exams").select("id, title, subject, status, created_at")
+                .order("created_at", { ascending: false }).limit(5),
+            supabase.from("profiles").select("id, full_name, role, status, created_at")
+                .order("created_at", { ascending: false }).limit(5),
+        ]);
 
-    useEffect(() => {
-        async function load() {
-            const [
-                students, teachers, exams, questions,
-                pendingUsersCount, pendingExamsCount,
-                approvedUsersCount, approvedExamsCount, totalUsersCount,
-                pendingUsers, pendingExams, recentExams, recentUsers,
-            ] = await Promise.all([
-                count(supabase.from("profiles")).eq("role", "student"),
-                count(supabase.from("profiles")).eq("role", "teacher"),
-                count(supabase.from("exams")),
-                count(supabase.from("questions")),
-                count(supabase.from("profiles")).eq("status", "pending"),
-                count(supabase.from("exams")).eq("status", "pending"),
-                count(supabase.from("profiles")).eq("status", "approved"),
-                count(supabase.from("exams")).eq("status", "approved"),
-                count(supabase.from("profiles")),
-                supabase.from("profiles").select("id, full_name, role, created_at")
-                    .eq("status", "pending").order("created_at", { ascending: false }).limit(5),
-                supabase.from("exams").select("id, title, subject, created_by, submitted_at")
-                    .eq("status", "pending").order("submitted_at", { ascending: false }).limit(5),
-                supabase.from("exams").select("id, title, subject, status, created_at")
-                    .order("created_at", { ascending: false }).limit(5),
-                supabase.from("profiles").select("id, full_name, role, status, created_at")
-                    .order("created_at", { ascending: false }).limit(5),
-            ]);
+        results.forEach((r) => ensure(r));
 
-            const all = [students, teachers, exams, questions, pendingUsersCount, pendingExamsCount,
-                approvedUsersCount, approvedExamsCount, totalUsersCount,
-                pendingUsers, pendingExams, recentExams, recentUsers];
-            if (all.some((r) => r.error)) {
-                toast.error("Could not load some numbers");
-                console.error(all.map((r) => r.error).filter(Boolean));
-            }
+        const [
+            students, teachers, exams, questions,
+            pendingUsersCount, pendingExamsCount,
+            approvedUsersCount, approvedExamsCount, totalUsersCount,
+            pendingUsers, pendingExams, recentExams, recentUsers,
+        ] = results;
 
-            // teacher names for the pending exams
-            const teacherIds = [...new Set((pendingExams.data ?? []).map((e) => e.created_by).filter(Boolean))];
-            let teacherNames = {};
-            if (teacherIds.length > 0) {
-                const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", teacherIds);
-                teacherNames = Object.fromEntries((profiles ?? []).map((p) => [p.id, p.full_name]));
-            }
-
-            // one feed from new exams and new registrations, newest first
-            const activity = [
-                ...(recentExams.data ?? []).map((e) => ({
-                    key: `exam-${e.id}`, kind: "exam", title: e.title,
-                    sub: `${e.subject} · ${e.status}`, date: e.created_at,
-                })),
-                ...(recentUsers.data ?? []).map((u) => ({
-                    key: `user-${u.id}`, kind: "user", title: `${u.full_name ?? "New user"} registered`,
-                    sub: `${u.role} account · ${u.status}`, date: u.created_at,
-                })),
-            ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6);
-
-            setData({
-                students: students.count ?? 0,
-                teachers: teachers.count ?? 0,
-                exams: exams.count ?? 0,
-                questions: questions.count ?? 0,
-                pendingUsersCount: pendingUsersCount.count ?? 0,
-                pendingExamsCount: pendingExamsCount.count ?? 0,
-                approvedUsers: approvedUsersCount.count ?? 0,
-                approvedExams: approvedExamsCount.count ?? 0,
-                totalUsers: totalUsersCount.count ?? 0,
-                pendingUsers: pendingUsers.data ?? [],
-                pendingExams: pendingExams.data ?? [],
-                teacherNames,
-                activity,
-            });
+        // teacher names for the pending exams
+        const teacherIds = [...new Set((pendingExams.data ?? []).map((e) => e.created_by).filter(Boolean))];
+        let teacherNames = {};
+        if (teacherIds.length > 0) {
+            const profilesRes = ensure(
+                await supabase.from("profiles").select("id, full_name").in("id", teacherIds)
+            );
+            teacherNames = Object.fromEntries((profilesRes.data ?? []).map((p) => [p.id, p.full_name]));
         }
-        load();
+
+        // one feed from new exams and new registrations, newest first
+        const activity = [
+            ...(recentExams.data ?? []).map((e) => ({
+                key: `exam-${e.id}`, kind: "exam", title: e.title,
+                sub: `${e.subject} · ${e.status}`, date: e.created_at,
+            })),
+            ...(recentUsers.data ?? []).map((u) => ({
+                key: `user-${u.id}`, kind: "user", title: `${u.full_name ?? "New user"} registered`,
+                sub: `${u.role} account · ${u.status}`, date: u.created_at,
+            })),
+        ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6);
+
+        return {
+            students: students.count ?? 0,
+            teachers: teachers.count ?? 0,
+            exams: exams.count ?? 0,
+            questions: questions.count ?? 0,
+            pendingUsersCount: pendingUsersCount.count ?? 0,
+            pendingExamsCount: pendingExamsCount.count ?? 0,
+            approvedUsers: approvedUsersCount.count ?? 0,
+            approvedExams: approvedExamsCount.count ?? 0,
+            totalUsers: totalUsersCount.count ?? 0,
+            pendingUsers: pendingUsers.data ?? [],
+            pendingExams: pendingExams.data ?? [],
+            teacherNames,
+            activity,
+        };
     }, []);
 
-    if (!data) return <PageLoader />;
+    if (loading) return <PageLoader />;
+    if (error) return <ErrorState message={error} onRetry={reload} />;
 
     const needsReview = data.pendingUsersCount + data.pendingExamsCount;
 
