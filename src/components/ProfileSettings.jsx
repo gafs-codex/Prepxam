@@ -3,14 +3,12 @@ import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { PageLoader } from "@/components/ui/Spinner"
-
-const SUBJECTS = [
-    "Mathematics", "English Language", "Physics", "Chemistry",
-    "Biology", "Economics", "Government", "Geography",
-    "Literature in English", "Agricultural Science", "Further Mathematics",
-    "Commerce", "Financial Accounting", "Christian Religious Studies",
-    "Islamic Religious Studies", "Civic Education", "Computer Studies", "History"
-];
+import ErrorState from "@/components/ui/ErrorState"
+import PasswordInput from "@/components/PasswordInput"
+import { useLoader } from "@/lib/useLoader"
+import { ensure, safe, notifyError, friendlyMessage } from "@/lib/net"
+import { admissionEmail } from "@/lib/admission"
+import { SUBJECTS } from "@/data/subjects"
 
 const inputClass = "flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm outline-none md:text-sm";
 const labelClass = "text-sm font-medium leading-none";
@@ -22,6 +20,11 @@ function roleText(profile) {
 }
 
 export default function ProfileSettings() {
+    const { data: loaded, error: loadError, loading, reload } = useLoader(async () => {
+        const { data } = ensure(await supabase.rpc("get_my_profile"));
+        return data;
+    }, []);
+
     const [profile, setProfile] = useState(null);
     const [fullName, setFullName] = useState("");
     const [photoUrl, setPhotoUrl] = useState("");
@@ -34,25 +37,23 @@ export default function ProfileSettings() {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [changingPassword, setChangingPassword] = useState(false);
 
+    // fill the form once the profile has loaded
     useEffect(() => {
-        async function load() {
-            const { data, error } = await supabase.rpc("get_my_profile");
-            if (error) {
-                toast.error(`Could not load your profile: ${error.message}`);
-                return;
-            }
-            setProfile(data);
-            setFullName(data.full_name ?? "");
-            setPhotoUrl(data.photo_url ?? "");
-            setSubjects(data.subjects ?? []);
-        }
-        load();
-    }, []);
+        if (!loaded) return;
+        setProfile(loaded);
+        setFullName(loaded.full_name ?? "");
+        setPhotoUrl(loaded.photo_url ?? "");
+        setSubjects(loaded.subjects ?? []);
+    }, [loaded]);
 
+    if (loading) return <PageLoader />;
+    if (loadError) return <ErrorState message={loadError} onRetry={reload} />;
     if (!profile) return <PageLoader />;
 
     const isAdmin = Boolean(profile.admin_role);
     const hasSubjects = !isAdmin && (profile.role === "teacher" || profile.role === "student");
+    const usesAdmission = !profile.email && Boolean(profile.admission_number);
+    const loginId = profile.email ?? profile.admission_number ?? "";
 
     function toggleSubject(name) {
         setSubjects((prev) => prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name]);
@@ -60,6 +61,7 @@ export default function ProfileSettings() {
 
     async function saveDetails(e) {
         e.preventDefault();
+        if (saving) return;
 
         if (fullName.trim() === "") {
             toast.error("Please enter your name");
@@ -76,24 +78,31 @@ export default function ProfileSettings() {
 
         setSaving(true);
 
-        const { error } = await supabase.rpc("update_my_profile", {
-            p_full_name: fullName.trim(),
-            p_photo_url: photoUrl.trim(),
-            p_subjects: hasSubjects ? subjects : [],
-        });
+        const { error } = await safe(
+            supabase.rpc("update_my_profile", {
+                p_full_name: fullName.trim(),
+                p_photo_url: photoUrl.trim(),
+                p_subjects: hasSubjects ? subjects : [],
+            }),
+            20000
+        );
 
         if (error) {
             setSaving(false);
-            toast.error(error.message);
+            notifyError(error, "Could not save");
             return;
         }
 
         // keep sign-in metadata in step (the exam form reads a teacher's subjects from it)
-        await supabase.auth.updateUser({
-            data: hasSubjects
-                ? { full_name: fullName.trim(), subjects }
-                : { full_name: fullName.trim() },
-        });
+        const { error: metaError } = await safe(
+            supabase.auth.updateUser({
+                data: hasSubjects
+                    ? { full_name: fullName.trim(), subjects }
+                    : { full_name: fullName.trim() },
+            }),
+            20000
+        );
+        if (metaError) console.error(metaError);
 
         setSaving(false);
         setImageFailed(false);
@@ -102,6 +111,7 @@ export default function ProfileSettings() {
 
     async function changePassword(e) {
         e.preventDefault();
+        if (changingPassword) return;
 
         if (!currentPassword) {
             toast.error("Enter your current password");
@@ -123,24 +133,31 @@ export default function ProfileSettings() {
         setChangingPassword(true);
 
         // Supabase doesn't check the old password itself, so verify it first
-        const { error: checkError } = await supabase.auth.signInWithPassword({
-            email: profile.email,
-            password: currentPassword,
-        });
+        const loginEmail = profile.email ?? admissionEmail(profile.admission_number);
+        const { error: checkError } = await safe(
+            supabase.auth.signInWithPassword({ email: loginEmail, password: currentPassword }),
+            20000
+        );
         if (checkError) {
             setChangingPassword(false);
-            toast.error("Your current password is incorrect");
+            const wrong = String(checkError.message).toLowerCase().includes("invalid login credentials");
+            toast.error(wrong ? "Your current password is incorrect" : friendlyMessage(checkError));
             return;
         }
 
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
-        setChangingPassword(false);
-
+        const { error } = await safe(supabase.auth.updateUser({ password: newPassword }), 20000);
         if (error) {
-            toast.error(error.message);
+            setChangingPassword(false);
+            notifyError(error, "Your password was not changed");
             return;
         }
 
+        if (profile.must_change_password) {
+            await safe(supabase.rpc("finish_password_change"));
+            setProfile((p) => ({ ...p, must_change_password: false }));
+        }
+
+        setChangingPassword(false);
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
@@ -152,7 +169,13 @@ export default function ProfileSettings() {
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
             <h1 className="text-2xl font-semibold tracking-tight">Profile settings</h1>
-            <p className="mt-1 text-sm text-muted">{roleText(profile)} · {profile.email}</p>
+            <p className="mt-1 text-sm text-muted">{roleText(profile)} · {loginId}</p>
+
+            {profile.must_change_password && (
+                <div className="mt-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-900">
+                    You're using a temporary password from the school. Set your own below before you continue.
+                </div>
+            )}
 
             <div className="mt-6 grid gap-6 lg:grid-cols-2">
                 <form onSubmit={saveDetails} className="space-y-5 rounded-xl border border-border bg-card p-6">
@@ -224,15 +247,21 @@ export default function ProfileSettings() {
                     )}
 
                     <div className="space-y-2">
-                        <label htmlFor="email" className={labelClass}>Email</label>
+                        <label htmlFor="loginId" className={labelClass}>
+                            {usesAdmission ? "Admission number" : "Email"}
+                        </label>
                         <input
-                            id="email"
-                            type="email"
-                            value={profile.email ?? ""}
+                            id="loginId"
+                            type="text"
+                            value={loginId}
                             disabled
                             className={`${inputClass} cursor-not-allowed opacity-60`}
                         />
-                        <p className="text-xs text-muted">Contact an administrator to change your sign-in email.</p>
+                        <p className="text-xs text-muted">
+                            {usesAdmission
+                                ? "Your admission number is your login. Contact the school to change it."
+                                : "Contact an administrator to change your sign-in email."}
+                        </p>
                     </div>
 
                     <button
@@ -249,37 +278,31 @@ export default function ProfileSettings() {
 
                     <div className="space-y-2">
                         <label htmlFor="currentPassword" className={labelClass}>Current password</label>
-                        <input
+                        <PasswordInput
                             id="currentPassword"
-                            type="password"
                             autoComplete="current-password"
                             value={currentPassword}
                             onChange={(e) => setCurrentPassword(e.target.value)}
-                            className={inputClass}
                         />
                     </div>
 
                     <div className="space-y-2">
                         <label htmlFor="newPassword" className={labelClass}>New password</label>
-                        <input
+                        <PasswordInput
                             id="newPassword"
-                            type="password"
                             autoComplete="new-password"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
-                            className={inputClass}
                         />
                     </div>
 
                     <div className="space-y-2">
                         <label htmlFor="confirmPassword" className={labelClass}>Confirm new password</label>
-                        <input
+                        <PasswordInput
                             id="confirmPassword"
-                            type="password"
                             autoComplete="new-password"
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
-                            className={inputClass}
                         />
                     </div>
 

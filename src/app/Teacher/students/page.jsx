@@ -71,7 +71,7 @@ export default function TeacherStudents() {
                             <thead>
                                 <tr className="border-b border-border bg-accent/30 text-left text-muted">
                                     <th className="p-4 font-medium">Name</th>
-                                    <th className="p-4 font-medium">Email</th>
+                                    <th className="p-4 font-medium">Email / admission no.</th>
                                     <th className="p-4 font-medium">Subjects</th>
                                     <th className="p-4 font-medium">Exams taken</th>
                                     <th className="p-4 font-medium">Average score</th>
@@ -87,7 +87,7 @@ export default function TeacherStudents() {
                                                 {s.full_name ?? "Unnamed"}
                                             </Link>
                                         </td>
-                                        <td className="p-4 text-muted">{s.email ?? "—"}</td>
+                                        <td className="p-4 text-muted">{s.email ?? s.admission_number ?? "—"}</td>
                                         <td className="p-4">
                                             <div className="flex flex-wrap gap-1">
                                                 {(s.shared_subjects ?? []).map((name) => (

@@ -1,96 +1,138 @@
 "use client"
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { toast } from "sonner"
+import { MailCheck, Info } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { safe, notifyError } from "@/lib/net"
 
-export default function ResetPassword() {
-    const router = useRouter()
-    const [ready, setReady] = useState(false)
-    const [password, setPassword] = useState("")
-    const [confirmPassword, setConfirmPassword] = useState("")
-    const [loading, setLoading] = useState(false)
+export default function ForgotPassword() {
+    const [value, setValue] = useState("")
+    const [sending, setSending] = useState(false)
+    const [sentTo, setSentTo] = useState(null)
+    const [cooldown, setCooldown] = useState(0)
 
+    // the login page passes along whatever the person had typed
     useEffect(() => {
-        // Supabase fires PASSWORD_RECOVERY once it reads the token from the emailed link
-        const { data: listener } = supabase.auth.onAuthStateChange((event) => {
-            if (event === "PASSWORD_RECOVERY") setReady(true)
-        })
-
-        // covers the case where the event fired before this effect ran
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session) setReady(true)
-        })
-
-        return () => listener.subscription.unsubscribe()
+        const id = new URLSearchParams(window.location.search).get("id")
+        if (id) setValue(id)
     }, [])
 
-    async function handleSubmit(e) {
+    useEffect(() => {
+        if (cooldown <= 0) return
+        const timer = setTimeout(() => setCooldown((c) => c - 1), 1000)
+        return () => clearTimeout(timer)
+    }, [cooldown])
+
+    const typed = value.trim()
+    const looksLikeAdmission = typed !== "" && !typed.includes("@")
+
+    async function send(e) {
         e.preventDefault()
+        if (sending || cooldown > 0) return
 
-        if (password.length < 6) {
-            toast.error("Password must be at least 6 characters")
+        if (typed === "") {
+            toast.error("Enter your email address")
             return
         }
-        if (password !== confirmPassword) {
-            toast.error("Passwords don't match")
-            return
-        }
+        if (looksLikeAdmission) return
 
-        setLoading(true)
-        const { error } = await supabase.auth.updateUser({ password })
-        setLoading(false)
+        setSending(true)
+        const { error } = await safe(
+            supabase.auth.resetPasswordForEmail(typed.toLowerCase(), {
+                redirectTo: `${window.location.origin}/reset-password`,
+            }),
+            20000
+        )
+        setSending(false)
 
         if (error) {
-            toast.error(error.message)
+            const text = String(error.message).toLowerCase()
+            if (error.status === 429 || text.includes("rate limit") || text.includes("seconds")) {
+                toast.error("Please wait a minute before asking for another link.")
+                setCooldown(60)
+            } else {
+                notifyError(error, "Could not send the link")
+            }
             return
         }
 
-        toast.success("Password updated. Please log in.")
-        await supabase.auth.signOut()
-        router.push("/login")
+        setSentTo(typed.toLowerCase())
+        setCooldown(60)
     }
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
             <div className="w-full max-w-md">
                 <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-                    <h1 className="text-xl font-semibold tracking-tight">Set a new password</h1>
-
-                    {!ready ? (
-                        <p className="mt-4 text-sm text-muted">
-                            Verifying your reset link... If nothing happens, the link may have expired. Request a new one from the login page.
-                        </p>
-                    ) : (
-                        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium leading-none">New password</label>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm focus:outline-none"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium leading-none">Confirm new password</label>
-                                <input
-                                    type="password"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm focus:outline-none"
-                                />
-                            </div>
+                    {sentTo ? (
+                        <div className="text-center">
+                            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-700">
+                                <MailCheck size={28} />
+                            </span>
+                            <h1 className="mt-5 text-xl font-semibold tracking-tight">Check your email</h1>
+                            <p className="mt-2 text-sm text-muted">
+                                If an account exists for <span className="font-medium text-foreground">{sentTo}</span>, a reset link is on its way. It can take a few minutes. Check your spam folder too.
+                            </p>
 
                             <button
-                                type="submit"
-                                disabled={loading}
-                                className="inline-flex w-full items-center justify-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                                type="button"
+                                onClick={send}
+                                disabled={sending || cooldown > 0}
+                                className="mt-6 inline-flex h-10 w-full items-center justify-center rounded-md border border-input bg-background text-sm font-medium shadow-sm cursor-pointer hover:bg-accent disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                {loading ? "Updating..." : "Update password"}
+                                {cooldown > 0 ? `Send again in ${cooldown}s` : sending ? "Sending..." : "Send again"}
                             </button>
-                        </form>
+                            <Link href="/login" className="mt-4 inline-block text-sm font-medium text-primary hover:underline">
+                                Back to log in
+                            </Link>
+                        </div>
+                    ) : (
+                        <>
+                            <h1 className="text-xl font-semibold tracking-tight">Reset your password</h1>
+                            <p className="mt-1 text-sm text-muted">
+                                Enter your email and we'll send you a link to choose a new password.
+                            </p>
+
+                            <form onSubmit={send} className="mt-6 space-y-4">
+                                <div className="space-y-2">
+                                    <label htmlFor="identifier" className="text-sm font-medium leading-none">
+                                        Email or admission number
+                                    </label>
+                                    <input
+                                        id="identifier"
+                                        type="text"
+                                        autoComplete="username"
+                                        autoCapitalize="none"
+                                        spellCheck={false}
+                                        value={value}
+                                        onChange={(e) => setValue(e.target.value)}
+                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm focus:outline-none"
+                                    />
+                                </div>
+
+                                {looksLikeAdmission && (
+                                    <div className="flex gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                                        <Info size={18} className="mt-0.5 shrink-0" />
+                                        <p>
+                                            Students don't have an email on file, so a link can't be sent. Ask your school admin to reset your password. They'll give you a temporary one, and you'll choose your own after you log in.
+                                        </p>
+                                    </div>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    disabled={sending || cooldown > 0 || looksLikeAdmission}
+                                    className="inline-flex w-full items-center justify-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {sending ? "Sending..." : cooldown > 0 ? `Wait ${cooldown}s` : "Send reset link"}
+                                </button>
+                            </form>
+
+                            <p className="mt-6 text-center text-sm text-muted">
+                                <Link href="/login" className="font-medium text-primary hover:underline">Back to log in</Link>
+                            </p>
+                        </>
                     )}
                 </div>
             </div>

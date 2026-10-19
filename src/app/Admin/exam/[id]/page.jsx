@@ -10,6 +10,9 @@ import { PageLoader } from "@/components/ui/Spinner"
 import ErrorState from "@/components/ui/ErrorState"
 import { useLoader } from "@/lib/useLoader"
 import { ensure, safe, notifyError } from "@/lib/net"
+import ExamAccessPanel from "@/components/ExamAccessPanel"
+
+
 
 export default function AdminExamDetail() {
     const { id } = useParams();
@@ -168,6 +171,14 @@ export default function AdminExamDetail() {
                 </div>
             )}
 
+            {
+                exam.status === "approved" && !exam.results_released && (
+                    <ExamAccessPanel
+                        exam={exam}
+                        onChange={(updated) => setData((prev) => ({ ...prev, exam: updated }))}
+                    />
+                )
+            }
             {exam.status === "approved" && (
                 <ResultsPanel
                     exam={exam}

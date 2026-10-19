@@ -45,6 +45,12 @@ export default function AuditEventText({ event }) {
             return <>{actor} enabled {d.role} {target}</>;
         case "user.role_changed":
             return <>{actor} changed {target} from {d.from} to {d.to}</>;
+        case "user.password_reset":
+            return <>{actor} reset the password for {target}</>;
+        case "students.imported":
+            return <>{actor} imported {target}</>;
+        case "exam.access":
+            return <>{actor} changed access settings for exam {target}</>;
         default:
             return <>{actor} {event.action} {target}</>;
     }
@@ -73,6 +79,9 @@ export function auditAction(event) {
         case "user.disabled": return `disabled ${d.role}`;
         case "user.enabled": return `enabled ${d.role}`;
         case "user.role_changed": return `changed role (${d.from} → ${d.to})`;
+        case "user.password_reset": return "reset password for";
+        case "students.imported": return "imported";
+        case "exam.access": return "changed access settings for exam";
         default: return event.action;
     }
 }

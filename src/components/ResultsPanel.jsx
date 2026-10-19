@@ -7,6 +7,7 @@ import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import ExportResultsButton from "@/components/ExportResultsButton"
 
 export default function ResultsPanel({ exam, onChange }) {
     const [progress, setProgress] = useState(null);
@@ -67,7 +68,11 @@ export default function ResultsPanel({ exam, onChange }) {
 
     return (
         <div className="mt-6 rounded-xl border border-border bg-card p-5">
-            <h2 className="font-medium">Results</h2>
+            
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="font-medium">Results</h2>
+                <ExportResultsButton exam={exam} />
+            </div>
 
             {progress && (
                 <p className="mt-2 text-sm text-muted">

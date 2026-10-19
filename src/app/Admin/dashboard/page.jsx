@@ -195,12 +195,12 @@ export default function AdminDashboard() {
                         ) : (
                             data.activity.map((item) => (
                                 <div key={item.key} className="flex items-center gap-3 p-4">
-                                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
-                                        {item.kind === "exam" ? <BookOpen size={18} /> : <Users size={18} />}
+                                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent">
+                                        {item.kind === "exam" ? <BookOpen size={18} /> : <Users size={14} />}
                                     </span>
                                     <div className="flex-1">
-                                        <p className="font-medium">{item.title}</p>
-                                        <p className="text-sm capitalize text-muted">{item.sub}</p>
+                                        <p className="font-medium text-sm">{item.title}</p>
+                                        <p className="text-[13px] capitalize text-muted">{item.sub}</p>
                                     </div>
                                     <span className="text-sm text-muted">{formatDate(item.date)}</span>
                                 </div>
@@ -215,27 +215,27 @@ export default function AdminDashboard() {
                         <Link href={USERS_URL} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 hover:bg-accent/40">
                             <Users size={20} className="text-primary" />
                             <span>
-                                <span className="block font-medium">Manage users</span>
-                                <span className="block text-sm text-muted">Review registrations and decisions</span>
+                                <span className="block font-medium text-sm">Manage users</span>
+                                <span className="block text-[13px] text-muted">Review registrations and decisions</span>
                             </span>
                         </Link>
                         <Link href={EXAMS_URL} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 hover:bg-accent/40">
                             <ClipboardCheck size={20} className="text-primary" />
                             <span>
-                                <span className="block font-medium">Review exams</span>
-                                <span className="block text-sm text-muted">Approve exams and release results</span>
+                                <span className="block font-medium text-sm">Review exams</span>
+                                <span className="block text-[13px] text-muted">Approve exams and release results</span>
                             </span>
                         </Link>
 
                         <div className="rounded-xl border border-border bg-card p-4">
-                            <h3 className="flex items-center gap-2 font-medium"><Clock size={18} className="text-primary" /> Approval queue</h3>
+                            <h3 className="flex items-center gap-2 font-medium text-sm"><Clock size={18} className="text-primary" /> Approval queue</h3>
                             {[
                                 { label: "Users approved", done: data.approvedUsers, total: data.totalUsers },
                                 { label: "Exams approved", done: data.approvedExams, total: data.exams },
                             ].map((row) => (
                                 <div key={row.label} className="mt-4">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-muted">{row.label}</span>
+                                        <span className="text-muted text-[13px]">{row.label}</span>
                                         <span>{row.done} / {row.total}</span>
                                     </div>
                                     <div className="mt-1 h-2 overflow-hidden rounded-full bg-primary/20">

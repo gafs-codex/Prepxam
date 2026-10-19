@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback, useRef } from "react"
+import Link from "next/link"
 import { toast } from "sonner"
 import { Check, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
@@ -78,7 +79,7 @@ export default function AdminUsers() {
         const { data, error } = await safe(
             supabase
                 .from("profiles")
-                .select("id, full_name, email, role, status, created_at")
+                .select("id, full_name, email, role, status, created_at,admission_number")
                 .eq("role", role)
                 .eq("status", status)
                 .order("created_at", { ascending: false })
@@ -143,7 +144,12 @@ export default function AdminUsers() {
 
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-            <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
+            <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
+                <Link href="/Admin/students/import" className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-sm font-medium text-white">
+                    Import students
+                </Link>
+            </div>
             <p className="mt-1 text-sm text-muted">Approve new registrations before they can use Examly.</p>
 
             <div className="mt-6 flex gap-1 border-b border-border">
@@ -202,7 +208,7 @@ export default function AdminUsers() {
                                 <div>
                                     <p className="font-medium">{u.full_name ?? "Unnamed"}</p>
                                     <p className="text-sm text-muted">
-                                        {u.email ?? "No email"} · registered {formatDate(u.created_at)}
+                                        {u.email ?? u.admission_number ?? "No email"} · registered {formatDate(u.created_at)}
                                     </p>
                                 </div>
 

@@ -10,12 +10,12 @@ import { ensure } from "@/lib/net"
 
 export default function BrowseExams() {
     const [search, setSearch] = useState("");
+    const [code, setCode] = useState("");
 
     const { data, error, loading, reload } = useLoader(async () => {
         const [examRes, mineRes] = await Promise.all([
             supabase.from("exams")
-                .select("id, title, subject, exam_type, duration_minutes, number_of_questions")
-                .eq("status", "approved")
+                .select("title, subject, duration_minutes, number_of_questions, requires_code, network_only").eq("status", "approved")
                 .order("created_at", { ascending: false }),
             supabase.rpc("my_attempts"),
         ]);

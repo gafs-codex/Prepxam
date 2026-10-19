@@ -1,11 +1,12 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { Clock, XCircle, Ban, TriangleAlert } from "lucide-react"
+import { Clock, XCircle, Ban, TriangleAlert, KeyRound } from "lucide-react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { PageLoader } from "@/components/ui/Spinner"
 import { isNetworkError } from "@/lib/rpc"
+import Link from "next/link"
 
 const MESSAGES = {
     pending: {
@@ -32,6 +33,12 @@ const MESSAGES = {
         title: "We couldn't check your account",
         body: "Something went wrong while loading your account. Please try again.",
     },
+    password: {
+        icon: KeyRound,
+        tone: "bg-blue-100 text-blue-700",
+        title: "Choose your own password",
+        body: "You're signed in with a temporary password from the school. Set a new one before you continue.",
+    },
 }
 
 export default function AccessGate({ children }) {
@@ -56,7 +63,7 @@ export default function AccessGate({ children }) {
 
         const { data, error } = await supabase
             .from("profiles")
-            .select("full_name, email, status, disabled")
+            .select("full_name, email, status, disabled, must_change_password")
             .eq("id", session.user.id)
             .single()
 
@@ -66,7 +73,12 @@ export default function AccessGate({ children }) {
             return "error"
         }
 
-        const next = data.disabled ? "disabled" : data.status === "approved" ? "ok" : data.status
+        const next = data.disabled
+            ? "disabled"
+            : data.status !== "approved"
+                ? data.status
+                : data.must_change_password ? "password" : "ok"
+
         setWho(data)
         setState(next)
         return next
@@ -79,6 +91,13 @@ export default function AccessGate({ children }) {
         window.addEventListener("focus", onFocus)
         return () => window.removeEventListener("focus", onFocus)
     }, [check])
+
+    // after changing the password, the next page should open normally
+    useEffect(() => {
+        if (state === "password" && !pathname.endsWith("/profile")) return
+        if (state === "password") check()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pathname])
 
     async function checkAgain() {
         setChecking(true)
@@ -96,7 +115,7 @@ export default function AccessGate({ children }) {
     if (state === "ok") return children
 
     // pending people may still edit their profile
-    if (state === "pending" && pathname.endsWith("/profile")) return children
+    if ((state === "pending" || state === "password") && pathname.endsWith("/profile")) return children
 
     const message = MESSAGES[state] ?? MESSAGES.error
     const Icon = message.icon
@@ -130,6 +149,15 @@ export default function AccessGate({ children }) {
                         >
                             {checking ? "Checking..." : "Check again"}
                         </button>
+                    )}
+                    
+                    {state === "password" && (
+                        <Link
+                            href={`/${pathname.split("/")[1]}/profile`}
+                            className="inline-flex h-10 items-center justify-center rounded-md bg-primary text-sm font-medium text-white"
+                        >
+                            Set a new password
+                        </Link>
                     )}
                     <button
                         type="button"

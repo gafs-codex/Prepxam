@@ -21,7 +21,7 @@ export default function StudentDashboardNavbar() {
                 </span>
 
                 <span className="text-lg font-semibold">
-                    Prexam
+                    Prepxam
                 </span>
             </div>
 

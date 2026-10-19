@@ -188,7 +188,7 @@ export default function TakeExam() {
         setFinishing({ auto, waiting: false });
 
         let delay = 2000;
-        for (;;) {
+        for (; ;) {
             if (unmountedRef.current) return;
 
             const flushed = await flushQueue();
@@ -305,7 +305,34 @@ export default function TakeExam() {
 
     async function start() {
         setBusy(true);
+
+        if (exam.requires_code || exam.network_only) {
+            const gate = await callRpc("unlock_exam", { p_exam_id: id, p_code: code });
+            if (!gate.ok) {
+                setBusy(false);
+                toast.error(
+                    gate.network
+                        ? "Couldn't reach the server, so the exam hasn't started. Check your connection and try again."
+                        : friendlyMessage(gate.error)
+                );
+                return;
+            }
+
+            const blocked = {
+                network: "This exam can only be taken on the school network.",
+                wrong: "That code isn't correct. Check with your invigilator.",
+                locked: "Too many wrong codes. Ask your invigilator for help.",
+            }[gate.data];
+
+            if (blocked) {
+                setBusy(false);
+                toast.error(blocked);
+                return;
+            }
+        }
+
         const res = await callRpc("start_attempt", { p_exam_id: id });
+        // ...the rest of your existing start() stays as it is  
 
         if (!res.ok) {
             setBusy(false);
@@ -433,11 +460,27 @@ export default function TakeExam() {
                         <li>You can take this exam once. Your answers are saved as you go.</li>
                         <li>If your connection drops, keep answering. Your answers are kept on this device and upload when you reconnect.</li>
                         <li>Use the flag button to mark questions you want to come back to.</li>
+                        {exam.network_only && <li>This exam can only be taken on the school network.</li>}
                     </ul>
+
+                    {exam.requires_code && (
+                        <div className="mt-5">
+                            <label htmlFor="examCode" className="text-sm font-medium">Exam code</label>
+                            <input
+                                id="examCode"
+                                value={code}
+                                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                                placeholder="Ask your invigilator"
+                                maxLength={12}
+                                autoComplete="off"
+                                className="mt-1 flex h-10 w-full rounded-md border border-input bg-transparent px-3 text-base uppercase tracking-widest outline-none"
+                            />
+                        </div>
+                    )}
                     <button
                         type="button"
                         onClick={start}
-                        disabled={busy}
+                        disabled={busy || (exam.requires_code && code.trim().length < 4)}
                         className="mt-6 inline-flex h-10 w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-white cursor-pointer disabled:opacity-60"
                     >
                         {busy ? "Starting..." : "Start exam"}

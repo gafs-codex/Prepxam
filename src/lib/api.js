@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase"
 import { friendlyMessage } from "@/lib/net"
+import { isNetworkError } from "@/lib/rpc"
 
 export async function apiPost(url, body, timeoutMs = 20000) {
     const controller = new AbortController()
@@ -31,6 +32,31 @@ export async function apiPost(url, body, timeoutMs = 20000) {
             return { ok: false, error: "This is taking too long. It may still have gone through, so refresh to check." }
         }
         return { ok: false, error: friendlyMessage(err) }
+    } finally {
+        clearTimeout(timer)
+    }
+}
+
+// a call that needs no login, for sign-up
+export async function publicPost(url, body, timeoutMs = 20000) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+    try {
+        const res = await fetch(url, {
+            method: "POST",
+            signal: controller.signal,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        })
+
+        let result = {}
+        try { result = await res.json() } catch { /* the server sent no JSON */ }
+
+        if (!res.ok) return { ok: false, error: result.error ?? `The server returned an error (${res.status}).` }
+        return { ok: true, ...result }
+    } catch (err) {
+        return { ok: false, error: friendlyMessage(err), network: isNetworkError(err) }
     } finally {
         clearTimeout(timer)
     }

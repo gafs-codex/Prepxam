@@ -248,6 +248,10 @@ export default function TeacherExam() {
                                         {locked ? "View" : "Review"}
                                     </Link>
 
+                                    {exam.results_released && (
+                                        <Link href={`/Teacher/exams/${exam.id}/results`} className={outlineBtn}>Results</Link>
+                                    )}
+
                                     {/* Delete is only offered while the exam is still yours to change */}
                                     {!locked && (
                                         <button

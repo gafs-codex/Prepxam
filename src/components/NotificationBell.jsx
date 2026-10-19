@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Bell } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { safe, notifyError } from "@/lib/net"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -31,11 +32,17 @@ export default function NotificationBell() {
     const [userId, setUserId] = useState(null);
 
     const load = useCallback(async () => {
-        const { data } = await supabase
-            .from("notifications")
-            .select("id, title, body, link, read, created_at")
-            .order("created_at", { ascending: false })
-            .limit(15);
+        const { data, error } = await safe(
+            supabase
+                .from("notifications")
+                .select("id, title, body, link, read, created_at")
+                .order("created_at", { ascending: false })
+                .limit(15)
+        );
+        if (error) {
+            console.error(error);   // a background widget fails quietly
+            return;
+        }
         setItems(data ?? []);
     }, []);
 
@@ -71,17 +78,40 @@ export default function NotificationBell() {
 
     const unread = items.filter((n) => !n.read).length;
 
-    async function openItem(n) {
+    function openItem(n) {
         if (!n.read) {
             setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
-            await supabase.from("notifications").update({ read: true }).eq("id", n.id);
+            safe(supabase.from("notifications").update({ read: true }).eq("id", n.id));
         }
         if (n.link) router.push(n.link);
     }
 
     async function markAllRead() {
+        if (!userId) return;
+        const previous = items;
         setItems((prev) => prev.map((x) => ({ ...x, read: true })));
-        await supabase.from("notifications").update({ read: true }).eq("user_id", userId).eq("read", false);
+
+        const { error } = await safe(
+            supabase.from("notifications").update({ read: true }).eq("user_id", userId).eq("read", false)
+        );
+        if (error) {
+            setItems(previous);
+            notifyError(error, "Could not mark them as read");
+        }
+    }
+
+    async function clearAll() {
+        if (!userId) return;
+        const previous = items;
+        setItems([]);
+
+        const { error } = await safe(
+            supabase.from("notifications").delete().eq("user_id", userId)
+        );
+        if (error) {
+            setItems(previous);
+            notifyError(error, "Could not clear your notifications");
+        }
     }
 
     return (
@@ -100,19 +130,30 @@ export default function NotificationBell() {
                 </button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" sideOffset={8} className="w-80">
+            <DropdownMenuContent align="end" sideOffset={8} className="w-[22rem]">
                 <DropdownMenuGroup>
-                    <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
+                    <DropdownMenuLabel className="flex items-center justify-between gap-3 px-3 py-2">
                         <span className="text-base font-semibold">Notifications</span>
-                        {unread > 0 && (
-                            <button
-                                type="button"
-                                onClick={markAllRead}
-                                className="text-xs font-medium text-primary hover:underline cursor-pointer"
-                            >
-                                Mark all as read
-                            </button>
-                        )}
+                        <span className="flex items-center gap-3">
+                            {unread > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={markAllRead}
+                                    className="text-xs font-medium text-primary hover:underline cursor-pointer"
+                                >
+                                    Mark all as read
+                                </button>
+                            )}
+                            {items.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={clearAll}
+                                    className="text-xs font-medium text-muted hover:text-foreground hover:underline cursor-pointer"
+                                >
+                                    Clear all
+                                </button>
+                            )}
+                        </span>
                     </DropdownMenuLabel>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />

@@ -81,7 +81,7 @@ export default function AllUsers() {
             try {
                 let request = supabase
                     .from("profiles")
-                    .select("id, full_name, email, role, status, disabled, created_at", { count: "exact" })
+                    .select("id, full_name, email, admission_number,role, status, disabled, created_at", { count: "exact" })
                     .order("created_at", { ascending: false })
                     .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
@@ -251,7 +251,7 @@ export default function AllUsers() {
                                 return (
                                     <tr key={u.id} className="border-b border-border last:border-0 hover:bg-accent/20">
                                         <td className="px-6 py-4 font-medium">{u.full_name ?? "Unnamed"}</td>
-                                        <td className="px-6 py-4 text-muted">{u.email ?? "—"}</td>
+                                        <td className="px-6 py-4 text-muted">{u.email ?? u.admission_number ?? "—"}</td>
                                         <td className="px-6 py-4">{roleLabel}</td>
                                         <td className="px-6 py-4">
                                             <span className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${badgeStyles[state] ?? "bg-accent"}`}>

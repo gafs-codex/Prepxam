@@ -5,64 +5,81 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import PasswordInput from "@/components/PasswordInput";
+import { admissionEmail } from "@/lib/admission";
+import { notifyError, safe } from "@/lib/net";
 
 export default function Login() {
     const router = useRouter();
-    const [email, setEmail] = useState("");
+    const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
     const [rememberMe, setRememberMe] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
     async function handleLogin(e) {
         e.preventDefault();
+        if (submitting) return;
+
+        const typed = identifier.trim();
+        if (typed === "") {
+            toast.error("Enter your admission number or email");
+            return;
+        }
+        if (password === "") {
+            toast.error("Enter your password");
+            return;
+        }
+
         setSubmitting(true);
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email.trim(),
-            password,
-        });
+        // an "@" means an email (teachers, admins). Anything else is an admission number.
+        const loginEmail = typed.includes("@") ? typed.toLowerCase() : admissionEmail(typed);
+
+        const { data, error } = await safe(
+            supabase.auth.signInWithPassword({ email: loginEmail, password }),
+            20000
+        );
 
         if (error) {
             setSubmitting(false);
-            toast.error(
-                error.message.toLowerCase().includes("banned")
-                    ? "This account has been disabled. Please contact the school."
-                    : error.message
-            );
+            const text = String(error.message).toLowerCase();
+            if (text.includes("banned")) {
+                toast.error("This account has been disabled. Please contact the school.");
+            } else if (text.includes("invalid login credentials")) {
+                toast.error("Wrong admission number or email, or wrong password.");
+            } else {
+                notifyError(error);
+            }
             return;
         }
 
-        const { data: adminRow } = await supabase
-            .from("admins")
-            .select("role")
-            .eq("user_id", data.user.id)
-            .maybeSingle();
+        const userId = data.user.id;
 
-        if (adminRow) {
-            toast.success("Logged in!");
-            router.push(adminRow.role === "super_admin" ? "/Super/platform" : "/Admin/dashboard");
-            return;
-        }
-
-        const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", data.user.id)
-            .single();
-
-        if (profileError) {
+        const adminRes = await safe(
+            supabase.from("admins").select("role").eq("user_id", userId).maybeSingle()
+        );
+        if (adminRes.error) {
             setSubmitting(false);
-            toast.error("Logged in, but couldn't load your profile");
+            notifyError(adminRes.error, "Logged in, but couldn't check your account");
+            return;
+        }
+
+        if (adminRes.data) {
+            toast.success("Logged in!");
+            router.push(adminRes.data.role === "super_admin" ? "/Super/platform" : "/Admin/dashboard");
+            return;
+        }
+
+        const profileRes = await safe(
+            supabase.from("profiles").select("role").eq("id", userId).single()
+        );
+        if (profileRes.error) {
+            setSubmitting(false);
+            notifyError(profileRes.error, "Logged in, but couldn't load your profile");
             return;
         }
 
         toast.success("Logged in!");
-
-        if (profile.role === "teacher") {
-            router.push("/Teacher/dashboard");
-        } else {
-            router.push("/student/dashboard");
-        }
+        router.push(profileRes.data.role === "teacher" ? "/Teacher/dashboard" : "/student/dashboard");
     }
 
     return (
@@ -77,15 +94,18 @@ export default function Login() {
                     <div className="mt-6">
                         <form onSubmit={handleLogin} className="space-y-4">
                             <div className="space-y-2">
-                                <label htmlFor="email" className="text-sm font-medium leading-none">
-                                    Email
+                                <label htmlFor="identifier" className="text-sm font-medium leading-none">
+                                    Admission number or email
                                 </label>
                                 <input
-                                    id="email"
-                                    type="email"
-                                    autoComplete="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                                    id="identifier"
+                                    type="text"
+                                    autoComplete="username"
+                                    autoCapitalize="none"
+                                    spellCheck={false}
+                                    value={identifier}
+                                    onChange={(e) => setIdentifier(e.target.value)}
+                                    // placeholder="BC/STD/2026/0399"
                                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm focus:outline-none"
                                 />
                             </div>
@@ -114,7 +134,10 @@ export default function Login() {
                                     />
                                     Remember me
                                 </label>
-                                <Link className="text-sm font-medium text-primary hover:underline" href="/forgot-password">
+                                <Link
+                                    className="text-sm font-medium text-primary hover:underline"
+                                    href={identifier.trim() ? `/forgot-password?id=${encodeURIComponent(identifier.trim())}` : "/forgot-password"}
+                                >
                                     Forgot password?
                                 </Link>
                             </div>
@@ -126,6 +149,10 @@ export default function Login() {
                             >
                                 {submitting ? "Logging in..." : "Log in"}
                             </button>
+
+                            <p className="text-center text-xs text-muted">
+                                Students: if you forgot your password, ask the school to reset it.
+                            </p>
                         </form>
 
                         <p className="mt-6 text-center text-sm text-muted">
