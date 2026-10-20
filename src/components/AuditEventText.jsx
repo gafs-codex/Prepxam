@@ -51,6 +51,8 @@ export default function AuditEventText({ event }) {
             return <>{actor} imported {target}</>;
         case "exam.access":
             return <>{actor} changed access settings for exam {target}</>;
+        case "questions.imported":
+            return <>{actor} imported {target}</>;
         default:
             return <>{actor} {event.action} {target}</>;
     }
@@ -82,6 +84,7 @@ export function auditAction(event) {
         case "user.password_reset": return "reset password for";
         case "students.imported": return "imported";
         case "exam.access": return "changed access settings for exam";
+        case "questions.imported": return "imported";
         default: return event.action;
     }
 }
@@ -110,6 +113,8 @@ export function auditDetail(event) {
             ? "Students see their score as soon as they submit"
             : "Students wait until results are released";
     }
+
+    if (event.action === "questions.imported" && d.owner) return `For ${d.owner}`;
 
     return null;
 }

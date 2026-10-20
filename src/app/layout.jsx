@@ -6,6 +6,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import OfflineBanner from "@/components/OfflineBanner";
+import RecoveryRedirect from "@/components/RecoveryRedirect";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,6 +29,7 @@ export default function RootLayout({ children }) {
         </AuthProvider>
         <Toaster />
         <OfflineBanner />
+        <RecoveryRedirect />
         <Analytics />
         <SpeedInsights />
       </body>

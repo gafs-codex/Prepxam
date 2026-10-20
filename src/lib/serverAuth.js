@@ -59,3 +59,30 @@ export function serviceClient() {
     if (!url || !serviceKey) return null
     return createClient(url, serviceKey, noSession)
 }
+
+// Confirms the caller is an approved teacher or an admin.
+export async function requireImporter(request) {
+    if (!serviceKey) return { response: reply({ error: "The server is missing SUPABASE_SERVICE_ROLE_KEY." }, 500) }
+
+    const token = request.headers.get("authorization")?.replace("Bearer ", "")
+    if (!token) return { response: reply({ error: "Not signed in." }, 401) }
+
+    const userClient = createClient(url, anonKey, {
+        ...noSession,
+        global: { headers: { Authorization: `Bearer ${token}` } },
+    })
+
+    const { data: { user }, error } = await userClient.auth.getUser(token)
+    if (error || !user) return { response: reply({ error: "Not signed in." }, 401) }
+
+    const [admin, teacher] = await Promise.all([
+        userClient.rpc("is_admin"),
+        userClient.rpc("is_approved_teacher"),
+    ])
+    const isAdmin = Boolean(admin.data)
+    if (!isAdmin && !teacher.data) {
+        return { response: reply({ error: "Only approved teachers and admins can import questions." }, 403) }
+    }
+
+    return { user, isAdmin, service: createClient(url, serviceKey, noSession) }
+}

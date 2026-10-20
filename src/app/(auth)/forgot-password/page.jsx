@@ -16,6 +16,10 @@ export default function ForgotPassword() {
     useEffect(() => {
         const id = new URLSearchParams(window.location.search).get("id")
         if (id) setValue(id)
+            
+        if (new URLSearchParams(window.location.search).get("expired")) {
+            toast.error("That reset link has expired or was already used. Request a new one.")
+        }
     }, [])
 
     useEffect(() => {

@@ -1,19 +1,21 @@
 "use client"
 import Link from "next/link"
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import PasswordInput from "@/components/PasswordInput";
-import { notifyError } from "@/lib/net";
+import { notifyError, safe } from "@/lib/net";
 import { isNetworkError } from "@/lib/rpc";
 import { publicPost } from "@/lib/api";
-import { admissionKey } from "@/lib/admission";
+import { admissionKey, admissionEmail } from "@/lib/admission";
 import { SUBJECTS } from "@/data/subjects";
 
 const inputClass = "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm focus:outline-none";
 const labelClass = "text-sm font-medium leading-none";
 
 export default function Register() {
+    const router = useRouter();
     const [role, setRole] = useState("student");
     const [fullName, setFullName] = useState("");
     const [identifier, setIdentifier] = useState(""); // admission number (student) or email (teacher)
@@ -86,7 +88,14 @@ export default function Register() {
 
         setSubmitting(true);
 
-        // students: the server creates an already-confirmed account that waits for approval
+        const alreadyTaken = (message) => {
+            toast.error(message, {
+                duration: 9000,
+                action: { label: "Log in", onClick: () => router.push("/login") },
+            });
+        };
+
+        // ---- students: the server creates the account, then we log them in ----
         if (isStudent) {
             const res = await publicPost("/api/register", {
                 fullName: fullName.trim(),
@@ -94,32 +103,44 @@ export default function Register() {
                 password,
                 subjects: selectedSubjects,
             });
-            setSubmitting(false);
 
             if (!res.ok) {
+                setSubmitting(false);
                 if (res.network) {
                     toast.error(
                         "We couldn't confirm your account was created. Check your connection, then try to log in before registering again.",
                         { duration: 10000 }
                     );
+                } else if (/already has an account/i.test(res.error)) {
+                    alreadyTaken(res.error);
                 } else {
                     toast.error(res.error);
                 }
                 return;
             }
 
-            resetForm();
-            toast.success(
-                "Account created! The school must approve it before you can use it. You can log in with your admission number to check.",
-                { duration: 9000 }
+            const { error: loginError } = await safe(
+                supabase.auth.signInWithPassword({ email: admissionEmail(typed), password }),
+                20000
             );
+            setSubmitting(false);
+            resetForm();
+
+            if (loginError) {
+                toast.success("Account created! Log in with your admission number. The school must approve it before you can use it.", { duration: 9000 });
+                router.push("/login");
+                return;
+            }
+            toast.success("Account created! The school will approve it shortly.", { duration: 7000 });
+            router.push("/student/dashboard");
             return;
         }
 
-        // teachers: normal sign-up, with an email confirmation
+        // ---- teachers ----
+        let result = null;
         let signUpError = null;
         try {
-            const { error } = await supabase.auth.signUp({
+            result = await supabase.auth.signUp({
                 email: typed.toLowerCase(),
                 password,
                 options: {
@@ -130,7 +151,7 @@ export default function Register() {
                     },
                 },
             });
-            signUpError = error;
+            signUpError = result.error;
         } catch (err) {
             signUpError = err;
         }
@@ -138,7 +159,10 @@ export default function Register() {
         setSubmitting(false);
 
         if (signUpError) {
-            if (isNetworkError(signUpError)) {
+            const text = String(signUpError.message ?? "").toLowerCase();
+            if (text.includes("already registered") || text.includes("already been registered") || text.includes("already exists")) {
+                alreadyTaken("An account with this email already exists. Log in instead, or use Forgot password.");
+            } else if (isNetworkError(signUpError)) {
                 toast.error(
                     "We couldn't confirm your account was created. Check your connection, then try to log in before registering again.",
                     { duration: 10000 }
@@ -149,11 +173,21 @@ export default function Register() {
             return;
         }
 
+        // with confirmation switched on, Supabase hides duplicates by returning a user without identities
+        const created = result?.data?.user;
+        if (created && Array.isArray(created.identities) && created.identities.length === 0) {
+            alreadyTaken("An account with this email already exists. Log in instead, or use Forgot password.");
+            return;
+        }
+
         resetForm();
-        toast.success(
-            "Account created! Check your email to confirm it. The school must also approve your account before you can use it.",
-            { duration: 9000 }
-        );
+        if (result?.data?.session) {
+            toast.success("Account created! The school will approve it shortly.", { duration: 7000 });
+            router.push("/Teacher/dashboard");
+        } else {
+            toast.success("Account created! The school must approve it before you can use it. Log in to check.", { duration: 9000 });
+            router.push("/login");
+        }
     }
 
     return (
@@ -162,7 +196,7 @@ export default function Register() {
                 <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
                     <h1 className="text-xl font-semibold tracking-tight">Create your account</h1>
                     <p className="mt-1 text-sm text-muted">
-                        Your account needs approval from the school before you can use it.
+                        Pick the role that matches how you'll use the platform.
                     </p>
 
                     <div className="mt-6">
@@ -220,7 +254,7 @@ export default function Register() {
                                 <p className="text-xs text-muted">
                                     {isStudent
                                         ? "Use the number the school gave you. You'll log in with it."
-                                        : "We'll send a confirmation link to this address."}
+                                        : ""}
                                 </p>
                             </div>
 
