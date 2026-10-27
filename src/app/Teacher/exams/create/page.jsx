@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import FilterDropdown from "@/components/FilterDropdown"
 import { supabase } from "@/lib/supabase"
+import Toggle from "@/components/ui/Toggle"
 
 const ExamTypes = ["Internal test", "WAEC", "NECO", "JAMB", "GCE"]
 
@@ -18,6 +19,8 @@ export default function CreateExam() {
     const [numberOfQuestions, setNumberOfQuestions] = useState("20");
     const [description, setDescription] = useState("");
     const [saving, setSaving] = useState(false);
+    const [hasObjective, setHasObjective] = useState(true);
+    const [hasTheory, setHasTheory] = useState(false);
 
     useEffect(() => {
         async function loadSubjects() {
@@ -52,6 +55,10 @@ export default function CreateExam() {
             return;
         }
 
+        if (!hasObjective && !hasTheory) {
+            toast.error("Turn on at least one section");
+            return;
+        }
         setSaving(true);
 
         const { data: { user } } = await supabase.auth.getUser();
@@ -71,6 +78,8 @@ export default function CreateExam() {
                 number_of_questions: questionsNum,
                 description: description.trim(),
                 created_by: user.id,
+                has_objective: hasObjective,
+                has_theory: hasTheory,
             })
             .select()
             .single();
@@ -141,6 +150,11 @@ export default function CreateExam() {
                                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm md:text-sm outline-none"
                             />
                         </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <Toggle checked={hasObjective} onChange={setHasObjective} label="Section A: objective questions" hint="Questions with options the student picks from." />
+                        <Toggle checked={hasTheory} onChange={setHasTheory} label="Section B: theory questions" hint="Written answers, marked by the teacher." />
                     </div>
 
                     <div className="space-y-2">

@@ -1,4 +1,4 @@
-const strong = (text) => <span className="font-semibold">{text}</span>;
+const strong = (text) => <span className="font-semibold text-sm text-black">{text}</span>;
 
 const roleName = (role) => (role === "super_admin" ? "super admin" : "school admin");
 

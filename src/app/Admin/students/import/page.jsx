@@ -156,7 +156,10 @@ export default function ImportStudents() {
 
     return (
         <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-            <Link href="/Admin/user" className="text-sm text-muted flex items-center gap-2"> <MoveLeft strokeWidth={1.5} size={17} /> Users</Link>
+            <Link href="/Admin/user" className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-2 text-xs"> <MoveLeft strokeWidth={1.5} size={17} />
+                {/* Users */}
+                Go back
+            </Link>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">Import students</h1>
             <p className="mt-1 text-sm text-muted">
                 Upload a class list. Each student gets an account that's already approved, and logs in with their admission number.

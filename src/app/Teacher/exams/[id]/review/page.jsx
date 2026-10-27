@@ -150,17 +150,24 @@ export default function ReviewExam() {
                                 <span className="text-sm text-muted">{index + 1}.</span>
                                 <div className="flex-1">
                                     <p className="font-medium">{q.question_text}</p>
-                                    <ul className="mt-2 space-y-1 text-sm">
-                                        {(q.options ?? []).map((opt, i) => (
-                                            <li
-                                                key={i}
-                                                className={i === q.correct_index ? "font-medium text-green-600" : "text-muted"}
-                                            >
-                                                {String.fromCharCode(65 + i)}. {opt}
-                                                {i === q.correct_index && " ✓"}
-                                            </li>
-                                        ))}
-                                    </ul>
+                                    {q.question_type === "Theory" ? (
+                                        <p className="mt-2 text-sm text-muted">
+                                            Theory · {q.marks} mark{q.marks === 1 ? "" : "s"}{q.model_answer ? ` · Guide: ${q.model_answer}` : ""}
+                                        </p>
+                                    ) : (
+                                        <ul className="mt-2 space-y-1 text-sm">
+                                            {(q.options ?? []).map((opt, i) => (
+                                                <li
+                                                    key={i}
+                                                    className={i === q.correct_index ? "font-medium text-green-600" : "text-muted"}
+                                                >
+                                                    {String.fromCharCode(65 + i)}. {opt}
+                                                    {i === q.correct_index && " ✓"}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+
                                 </div>
 
                                 {!locked && (

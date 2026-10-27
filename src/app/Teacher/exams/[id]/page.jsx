@@ -147,6 +147,8 @@ export default function ExamOverview() {
                                 submitLabel="Save and add to exam"
                                 onQuestionCreated={(question) => addQuestionsToExam([question])}
                                 onCancel={() => setActivePanel("bank")}
+                                allowObjective={exam.has_objective !== false}
+                                allowTheory={Boolean(exam.has_theory)}
                             />
                         </div>
 
@@ -156,6 +158,8 @@ export default function ExamOverview() {
                                 examType={exam.exam_type}
                                 addedIds={examQuestions.map((q) => q.id)}
                                 onAddSelected={addQuestionsToExam}
+                                allowObjective={exam.has_objective !== false}
+                                allowTheory={Boolean(exam.has_theory)}
                             />
                         </div>
                     </div>

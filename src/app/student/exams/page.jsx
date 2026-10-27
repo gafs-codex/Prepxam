@@ -15,7 +15,8 @@ export default function BrowseExams() {
     const { data, error, loading, reload } = useLoader(async () => {
         const [examRes, mineRes] = await Promise.all([
             supabase.from("exams")
-                .select("title, subject, duration_minutes, number_of_questions, requires_code, network_only").eq("status", "approved")
+                .select("id, title, subject, exam_type, duration_minutes, number_of_questions, requires_code, network_only")
+                .eq("status", "approved")
                 .order("created_at", { ascending: false }),
             supabase.rpc("my_attempts"),
         ]);

@@ -8,7 +8,7 @@ import { useLoader } from "@/lib/useLoader"
 import { ensure } from "@/lib/net"
 import { Checkbox } from "./ui/checkbox";
 
-export default function AddFromBank({ onAddSelected, subject, examType, addedIds = [] }) {
+export default function AddFromBank({ onAddSelected, subject, examType, addedIds = [], allowObjective = true, allowTheory = false }) {
     const [search, setSearch] = useState("")
     const [selectedIds, setSelectedIds] = useState([])
 
@@ -26,10 +26,12 @@ export default function AddFromBank({ onAddSelected, subject, examType, addedIds
 
     const bankQuestions = data ?? []
 
+    const kindOk = (q) => (q.question_type === "Theory" ? allowTheory : allowObjective);
     const visibleQuestions = bankQuestions.filter((q) =>
+        kindOk(q) &&
         !addedIds.includes(q.id) &&
         q.question_text.toLowerCase().includes(search.toLowerCase())
-    )
+    );
 
     function toggleSelect(id) {
         setSelectedIds((prev) => {
@@ -42,6 +44,8 @@ export default function AddFromBank({ onAddSelected, subject, examType, addedIds
         onAddSelected(selectedQuestions)
         setSelectedIds([])
     }
+
+
 
     return (
         <div className="rounded-xl border border-border bg-card p-5 mt-6">

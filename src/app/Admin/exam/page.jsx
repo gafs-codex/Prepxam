@@ -211,7 +211,7 @@ export default function AdminExams() {
                                                         Edit title / time
                                                     </button>
                                                 )}
-                                                <Link href={`/Admin/exams/${exam.id}`} className={outlineBtn}>
+                                                <Link href={`/Admin/exam/${exam.id}`} className={outlineBtn}>
                                                     {exam.status === "approved" ? "View" : "Review"}
                                                 </Link>
                                             </>

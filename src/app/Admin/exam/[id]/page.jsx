@@ -11,6 +11,8 @@ import ErrorState from "@/components/ui/ErrorState"
 import { useLoader } from "@/lib/useLoader"
 import { ensure, safe, notifyError } from "@/lib/net"
 import ExamAccessPanel from "@/components/ExamAccessPanel"
+import SupervisedPanel from "@/components/SupervisedPanel"
+import { MoveLeft } from "lucide-react"
 
 
 
@@ -57,7 +59,7 @@ export default function AdminExamDetail() {
         return (
             <main className="mx-auto max-w-2xl px-4 py-12 text-center">
                 <p>This exam doesn't exist.</p>
-                <Link href="/Admin/exams" className="mt-4 inline-block text-primary hover:underline">Back to all exams</Link>
+                <Link href="/Admin/exam" className="mt-4 inline-block text-primary hover:underline">Back to all exams</Link>
             </main>
         );
     }
@@ -102,7 +104,10 @@ export default function AdminExamDetail() {
 
     return (
         <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-            <Link href="/Admin/exams" className="text-sm text-muted">← All exams</Link>
+            <Link href="/Admin/user" className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-2 text-xs"> <MoveLeft strokeWidth={1.5} size={17} />
+                {/* Users */}
+                Go back
+            </Link>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">{exam.title}</h1>
             <p className="mt-1 text-sm text-muted">
                 {teacher} · {exam.subject} · {exam.exam_type} · {exam.duration_minutes} min · status: <span className="font-medium capitalize">{exam.status}</span>
@@ -179,6 +184,13 @@ export default function AdminExamDetail() {
                     />
                 )
             }
+            {exam.status === "approved" && !exam.results_released && (
+                <SupervisedPanel
+                    exam={exam}
+                    onChange={(updated) => setData((prev) => ({ ...prev, exam: updated }))}
+                />
+            )}
+
             {exam.status === "approved" && (
                 <ResultsPanel
                     exam={exam}

@@ -7,6 +7,8 @@ import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import OfflineBanner from "@/components/OfflineBanner";
 import RecoveryRedirect from "@/components/RecoveryRedirect";
+import RegisterServiceWorker from "@/components/RegisterServiceWorker";
+export const viewport = { themeColor: "#2954bc" };
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

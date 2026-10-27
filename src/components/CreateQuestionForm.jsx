@@ -5,11 +5,12 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner"
 import { safe, notifyError } from "@/lib/net";
 import { isNetworkError } from "@/lib/rpc";
+import Toggle from "@/components/ui/Toggle";
 
 const QuestionTypes = ["Multiple choice", "True or false", "Fill in the gap"];
 const ExamTypes = ["Internal test", "WAEC", "NECO", "JAMB", "GCE"]
 
-export default function CreateQuestionForm({ onQuestionCreated, onCancel, lockedSubject, lockedExamType, submitLabel = "Save question", }) {
+export default function CreateQuestionForm({ onQuestionCreated, onCancel, lockedSubject, lockedExamType, submitLabel = "Save question", allowObjective = true, allowTheory = true }) {
 
     const [subjects, setSubjects] = useState([]);
     const [subjectState, setSubjectState] = useState("");
@@ -20,6 +21,13 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
     const [correctIndex, setCorrectIndex] = useState(null);
     const [explanation, setExplanation] = useState("");
     const [submitting, setSubmitting] = useState(false);
+    const [hasOptions, setHasOptions] = useState(true);
+    const [marks, setMarks] = useState("5");
+    const [modelAnswer, setModelAnswer] = useState("");
+
+    // the exam's sections can force one kind
+    const optionsLocked = !allowObjective || !allowTheory;
+    const useOptions = !allowTheory ? true : !allowObjective ? false : hasOptions;
 
     const subject = lockedSubject ?? subjectState;
     const examType = lockedExamType ?? examTypeState;
@@ -79,13 +87,21 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
             return;
         }
 
-        if (options.some((option) => option.trim() === "")) {
-            toast.error("Some options are empty");
-            return;
-        }
-        if (correctIndex === null) {
-            toast.error("Please pick the correct option");
-            return;
+        if (useOptions) {
+            if (options.some((option) => option.trim() === "")) {
+                toast.error("Some options are empty");
+                return;
+            }
+            if (correctIndex === null) {
+                toast.error("Please pick the correct option");
+                return;
+            }
+        } else {
+            const m = Number(marks);
+            if (!Number.isInteger(m) || m < 1 || m > 100) {
+                toast.error("Marks must be a whole number from 1 to 100");
+                return;
+            }
         }
 
         setSubmitting(true);
@@ -102,11 +118,13 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
                 .from("questions")
                 .insert({
                     question_text: questionText,
-                    question_type: questionType,
+                    question_type: useOptions ? questionType : "Theory",
                     subject: subject,
                     exam_type: examType,
-                    options: options,
-                    correct_index: correctIndex,
+                    options: useOptions ? options : [],
+                    correct_index: useOptions ? correctIndex : null,
+                    marks: useOptions ? 1 : Number(marks),
+                    model_answer: useOptions ? null : (modelAnswer.trim() || null),
                     explanation: explanation,
                     created_by: session.user.id,
                 })
@@ -150,11 +168,22 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
                             className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted md:text-sm outline-none"></textarea>
                     </div>
 
+                    <Toggle
+                        checked={useOptions}
+                        onChange={setHasOptions}
+                        disabled={optionsLocked}
+                        label="Answer options"
+                        hint={optionsLocked
+                            ? "Fixed by this exam's sections."
+                            : "On: the student picks an option (Section A). Off: the student writes an answer (Section B, theory)."}
+                    />
+
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2 flex flex-col gap-2">
                             <label className="text-sm font-medium leading-none">Question type</label>
-                            <FilterDropdown options={QuestionTypes} value={questionType} onChange={handleQuestionTypeChange} />
-                        </div>
+                            {useOptions
+                                ? <FilterDropdown options={QuestionTypes} value={questionType} onChange={handleQuestionTypeChange} />
+                                : <div className={lockedBoxClass}>Theory (written answer)</div>}                        </div>
 
                         <div className="space-y-2 flex flex-col gap-2">
                             <label className="text-sm font-medium leading-none">Subject</label>

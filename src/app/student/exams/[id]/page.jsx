@@ -64,6 +64,7 @@ export default function TakeExam() {
     const [unsaved, setUnsaved] = useState(0);
     const [online, setOnline] = useState(true);
     const [finishing, setFinishing] = useState(null); // null | { auto, waiting }
+    const [code, setCode] = useState("");
 
     const offsetRef = useRef(0);          // server clock minus browser clock
     const attemptIdRef = useRef(null);
@@ -236,7 +237,7 @@ export default function TakeExam() {
             const examRes = await withTimeout(
                 supabase
                     .from("exams")
-                    .select("title, subject, duration_minutes, number_of_questions")
+                    .select("title, subject, duration_minutes, number_of_questions, requires_code")
                     .eq("id", id)
                     .maybeSingle(),
                 15000
@@ -306,7 +307,7 @@ export default function TakeExam() {
     async function start() {
         setBusy(true);
 
-        if (exam.requires_code || exam.network_only) {
+        if (exam.requires_code) {
             const gate = await callRpc("unlock_exam", { p_exam_id: id, p_code: code });
             if (!gate.ok) {
                 setBusy(false);
@@ -318,21 +319,19 @@ export default function TakeExam() {
                 return;
             }
 
-            const blocked = {
-                network: "This exam can only be taken on the school network.",
+            const refusal = {
                 wrong: "That code isn't correct. Check with your invigilator.",
                 locked: "Too many wrong codes. Ask your invigilator for help.",
             }[gate.data];
-
-            if (blocked) {
+            if (refusal) {
                 setBusy(false);
-                toast.error(blocked);
+                toast.error(refusal);
                 return;
             }
         }
 
         const res = await callRpc("start_attempt", { p_exam_id: id });
-        // ...the rest of your existing start() stays as it is  
+
 
         if (!res.ok) {
             setBusy(false);

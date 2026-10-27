@@ -9,7 +9,11 @@ import ErrorState from "@/components/ui/ErrorState"
 import { useLoader } from "@/lib/useLoader";
 import { ensure, safe, notifyError } from "@/lib/net";
 
+
 export default function EditQuestion() {
+    // const isTheory = data?.question?.question_type === "Theory";
+
+    
     const { id } = useParams();
     const router = useRouter();
     const [locked, setLocked] = useState(false);
@@ -18,6 +22,8 @@ export default function EditQuestion() {
     const [options, setOptions] = useState(["", "", "", ""]);
     const [correctIndex, setCorrectIndex] = useState(null);
     const [explanation, setExplanation] = useState("");
+    const [marks, setMarks] = useState("5");
+    const [modelAnswer, setModelAnswer] = useState("");
 
     const { data, error, loading, reload } = useLoader(async () => {
         const [questionRes, lockedRes] = await Promise.all([
@@ -44,6 +50,8 @@ export default function EditQuestion() {
         setCorrectIndex(q.correct_index);
         setExplanation(q.explanation || "");
         setLocked(data.locked);
+        setMarks(String(q.marks ?? 5));
+        setModelAnswer(q.model_answer ?? "");
     }, [data]);
 
     function updateOption(index, value) {

@@ -124,7 +124,7 @@ export default function PlatformOverview() {
                                 <div key={a.user_id} className="flex items-center gap-4 px-5 py-4">
                                     <ShieldCheck size={15} className="shrink-0 text-primary" />
                                     <div className="min-w-0 flex-1">
-                                        <p className="font-semibold">{a.full_name ?? "Unnamed"}</p>
+                                        <p className="font-semibold text-sm">{a.full_name ?? "Unnamed"}</p>
                                         <p className="truncate text-sm text-muted">{a.email ?? "No email"}</p>
                                     </div>
                                     <span className="shrink-0 text-sm text-muted">
@@ -149,7 +149,7 @@ export default function PlatformOverview() {
                         ) : (
                             events.slice(0, 5).map((event) => (
                                 <div key={event.id} className="flex items-center justify-between gap-4 px-5 py-4">
-                                    <p className="text-sm sm:text-base">
+                                    <p className="text-sm sm:text-base text-muted">
                                         <AuditEventText event={event} />
                                     </p>
                                     <span className="shrink-0 text-sm text-muted">{formatDate(event.created_at)}</span>
