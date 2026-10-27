@@ -12,9 +12,9 @@ const BATCH = 10;
 
 const norm = (h) => String(h).toLowerCase().replace(/[^a-z0-9]/g, "");
 
-function readStudents(text) {
-    const table = parseCsv(text);
-    if (table.length < 2) return { error: "The file has no student rows." };
+function readStudents(table) {
+    if (!table || table.length < 2) return { error: "The file has no student rows." };
+
 
     const headers = table[0].map(norm);
     const find = (names) => headers.findIndex((h) => names.includes(h));
@@ -89,8 +89,27 @@ export default function ImportStudents() {
             return;
         }
 
-        const text = await file.text();
-        const parsed = readStudents(text);
+        const ext = file.name.toLowerCase().split(".").pop();
+        let table;
+        try {
+            if (ext === "xlsx" || ext === "xls") {
+                const XLSX = await import("xlsx");
+                const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+                const sheet = wb.Sheets[wb.SheetNames[0]];
+                table = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+            } else if (ext === "csv" || ext === "txt") {
+                table = parseCsv(await file.text());
+            } else {
+                setFileError("Please choose a .csv or .xlsx file.");
+                return;
+            }
+        } catch (err) {
+            console.error(err);
+            setFileError("That file couldn't be read. Make sure it isn't damaged or password-protected.");
+            return;
+        }
+
+        const parsed = readStudents(table);
         setFileName(file.name);
         setResults([]);
         setStopped(null);
@@ -106,7 +125,6 @@ export default function ImportStudents() {
         setRows(parsed.rows);
         setPhase("ready");
     }
-
     async function runImport() {
         const todo = valid;
         if (todo.length === 0) return;
