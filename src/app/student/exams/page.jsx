@@ -13,16 +13,21 @@ export default function BrowseExams() {
     const [code, setCode] = useState("");
 
     const { data, error, loading, reload } = useLoader(async () => {
+        const { data: u } = await supabase.auth.getUser();
+        console.log("logged in as:", u?.user?.id, u?.user?.email);
+        
         const [examRes, mineRes] = await Promise.all([
             supabase.from("exams")
                 .select("id, title, subject, exam_type, duration_minutes, number_of_questions, requires_code, network_only")
                 .eq("status", "approved")
                 .order("created_at", { ascending: false }),
             supabase.rpc("my_attempts"),
+
         ]);
 
         ensure(examRes);
         ensure(mineRes);
+        console.log("exams from supabase:", examRes.data, "error:", examRes.error);
 
         const mine = mineRes.data ?? [];
         const done = new Set(mine.filter((a) => a.submitted_at).map((a) => a.exam_id));
@@ -34,6 +39,7 @@ export default function BrowseExams() {
             started,
         };
     }, []);
+
 
     const exams = data?.exams ?? [];
     const started = data?.started ?? new Set();

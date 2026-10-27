@@ -185,7 +185,7 @@ export default function ImportStudents() {
                 <h2 className="font-semibold">2. Choose the file</h2>
                 <label className="mt-3 inline-flex h-10 cursor-pointer items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-white">
                     <Upload size={16} /> Choose CSV file
-                    <input type="file" accept=".csv,text/csv" onChange={onFile} disabled={phase === "importing"} className="sr-only" />
+                    <input type="file" accept="text/csv,.docx,.xlsx,.xls,.csv" onChange={onFile} disabled={phase === "importing"} className="sr-only" />
                 </label>
                 {fileName && <span className="ml-3 text-sm text-muted">{fileName}</span>}
                 {fileError && <p className="mt-3 text-sm text-red-600">{fileError}</p>}
