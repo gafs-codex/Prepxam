@@ -55,6 +55,24 @@ export default function ExamOverview() {
         toast.success(`${toAdd.length} question(s) added`);
     }
 
+    async function enableSection(kind) {
+        const change = kind === "objective" ? { has_objective: true } : { has_theory: true };
+        const { data: changed, error: changeError } = await safe(
+            supabase.from("exams").update(change).eq("id", id).select("id"),
+            20000
+        );
+        if (changeError) {
+            notifyError(changeError, "Could not change the exam");
+            return;
+        }
+        if (!changed || changed.length === 0) {
+            toast.error("That change wasn't allowed. The exam may already be sent for approval.");
+            return;
+        }
+        setData((prev) => ({ ...prev, exam: { ...prev.exam, ...change } }));
+        toast.success(kind === "objective" ? "Section A is on" : "Section B is on");
+    }
+
     if (loading) return <PageLoader />;
     if (error) return <ErrorState message={error} onRetry={reload} />;
     if (!data?.exam) {
@@ -149,6 +167,7 @@ export default function ExamOverview() {
                                 onCancel={() => setActivePanel("bank")}
                                 allowObjective={exam.has_objective !== false}
                                 allowTheory={Boolean(exam.has_theory)}
+                                onEnableSection={enableSection}
                             />
                         </div>
 

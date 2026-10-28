@@ -1,5 +1,6 @@
 "use client"
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
+import Toggle from "@/components/ui/Toggle"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Upload, Download } from "lucide-react"
@@ -58,6 +59,9 @@ export default function QuestionImport({ backHref, backLabel }) {
     const [progress, setProgress] = useState(0)
     const [totals, setTotals] = useState(null)
     const [stopped, setStopped] = useState(null)
+    const [strict, setStrict] = useState(true)
+    const [stoppedByUser, setStoppedByUser] = useState(false)
+    const stopRef = useRef(false)
 
     // a teacher has only themselves to choose
     useEffect(() => {
@@ -93,6 +97,13 @@ export default function QuestionImport({ backHref, backLabel }) {
     const valid = checked.filter((r) => r.ok)
     const invalid = checked.filter((r) => !r.ok)
 
+    const blocked = strict && invalid.length > 0
+
+    function reset() {
+        setFileName(""); setItems([]); setFileError(null); setPhase("idle")
+        setProgress(0); setTotals(null); setStopped(null); setStoppedByUser(false)
+    }
+
     async function onFile(e) {
         const file = e.target.files?.[0]
         e.target.value = ""
@@ -118,16 +129,18 @@ export default function QuestionImport({ backHref, backLabel }) {
     }
 
     async function runImport() {
-        if (valid.length === 0 || !ownerId) return
-        setPhase("importing"); setStopped(null); setProgress(0)
+        if (valid.length === 0 || !ownerId || blocked) return
+        stopRef.current = false
+        setPhase("importing"); setStopped(null); setStoppedByUser(false); setProgress(0)
 
         const sum = { inserted: 0, duplicates: 0, invalid: 0, notTheirSubject: 0 }
         setTotals({ ...sum })
 
         for (let i = 0; i < valid.length; i += BATCH) {
+            if (stopRef.current) { setStoppedByUser(true); break }
+
             const chunk = valid.slice(i, i + BATCH).map((v) => v.question)
             const res = await apiPost("/api/questions/import", { action: "import", ownerId, questions: chunk }, 60000)
-
             if (!res.ok) { setStopped(res.error); break }
 
             sum.inserted += res.inserted
@@ -136,6 +149,11 @@ export default function QuestionImport({ backHref, backLabel }) {
             sum.notTheirSubject += res.notTheirSubject
             setTotals({ ...sum })
             setProgress(Math.min(i + BATCH, valid.length))
+
+            if (strict && (res.invalid > 0 || res.notTheirSubject > 0)) {
+                setStopped("The server rejected some questions, so the import was stopped.")
+                break
+            }
         }
         setPhase("done")
     }
@@ -296,23 +314,67 @@ export default function QuestionImport({ backHref, backLabel }) {
                 <section className="mt-4 rounded-xl border border-border bg-card p-6">
                     <h2 className="font-semibold">4. Import</h2>
 
-                    {phase !== "done" && (
-                        <button
-                            type="button"
-                            onClick={runImport}
-                            disabled={phase === "importing" || valid.length === 0}
-                            className="mt-3 inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-white cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                            {phase === "importing"
-                                ? `Importing... ${progress} of ${valid.length}`
-                                : `Import ${valid.length} question${valid.length === 1 ? "" : "s"}`}
-                        </button>
+                    {phase === "idle" && (
+                        <div className="mt-3 max-w-xl">
+                            <Toggle
+                                checked={strict}
+                                onChange={setStrict}
+                                label="Cancel if any question has a problem"
+                                hint="On: nothing is imported until every question is valid. Off: questions with problems are skipped and the rest are imported."
+                            />
+                        </div>
                     )}
-                    {phase === "importing" && <p className="mt-3 text-sm text-muted">Please keep this page open.</p>}
 
+                    {blocked && phase === "idle" && (
+                        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                            Nothing will be imported while {invalid.length} question{invalid.length === 1 ? " has" : "s have"} a problem. Fix the file and choose it again, or turn the option off to import the {valid.length} good one{valid.length === 1 ? "" : "s"}.
+                        </p>
+                    )}
+
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                        {phase === "idle" && (
+                            <button
+                                type="button"
+                                onClick={runImport}
+                                disabled={valid.length === 0 || blocked}
+                                className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-white cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                Import {valid.length} question{valid.length === 1 ? "" : "s"}
+                            </button>
+                        )}
+
+                        {phase === "importing" && (
+                            <>
+                                <span className="text-sm text-muted">Importing... {progress} of {valid.length}. Please keep this page open.</span>
+                                <button
+                                    type="button"
+                                    onClick={() => { stopRef.current = true }}
+                                    className="inline-flex h-10 items-center rounded-md border border-red-300 bg-background px-5 text-sm font-medium text-red-600 cursor-pointer hover:bg-red-50"
+                                >
+                                    Stop import
+                                </button>
+                            </>
+                        )}
+
+                        {phase !== "importing" && (
+                            <button
+                                type="button"
+                                onClick={reset}
+                                className="inline-flex h-10 items-center rounded-md border border-input bg-background px-5 text-sm font-medium shadow-sm cursor-pointer hover:bg-accent"
+                            >
+                                {phase === "done" ? "Import another file" : "Cancel"}
+                            </button>
+                        )}
+                    </div>
+
+                    {stoppedByUser && (
+                        <p className="mt-3 rounded-lg border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">
+                            You stopped the import. Questions already saved stay. Upload the same file again to continue. Questions already in the bank are skipped.
+                        </p>
+                    )}
                     {stopped && (
                         <p className="mt-3 rounded-lg border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">
-                            The import stopped: {stopped} Upload the same file again to continue. Questions already saved are skipped.
+                            The import stopped: {stopped} Questions already saved stay. Upload the same file again to continue.
                         </p>
                     )}
 

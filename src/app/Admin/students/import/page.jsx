@@ -1,20 +1,33 @@
 "use client"
-import { useState } from "react"
+import { useState, useRef } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { Upload, Download, MoveLeft } from "lucide-react"
+import { Upload, Download } from "lucide-react"
 import { apiPost } from "@/lib/api"
 import { parseCsv, toCsv, downloadCsv } from "@/lib/csv"
 import { admissionKey } from "@/lib/admission"
 import { SUBJECTS } from "@/data/subjects"
+import Toggle from "@/components/ui/Toggle"
 
 const BATCH = 10;
+const norm = (h) => String(h ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const text = (v) => String(v ?? "").trim();
 
-const norm = (h) => String(h).toLowerCase().replace(/[^a-z0-9]/g, "");
+async function readTable(file) {
+    const name = file.name.toLowerCase();
+    if (name.endsWith(".csv")) return parseCsv(await file.text());
+    if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+        const XLSX = await import("xlsx");
+        const book = XLSX.read(await file.arrayBuffer(), { type: "array" });
+        const sheet = book.Sheets[book.SheetNames[0]];
+        if (!sheet) throw new Error("The workbook is empty.");
+        return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+    }
+    throw new Error("Use an Excel (.xlsx) or CSV file.");
+}
 
 function readStudents(table) {
-    if (!table || table.length < 2) return { error: "The file has no student rows." };
-
+    if (table.length < 2) return { error: "The file has no student rows." };
 
     const headers = table[0].map(norm);
     const find = (names) => headers.findIndex((h) => names.includes(h));
@@ -28,11 +41,15 @@ function readStudents(table) {
     }
 
     const seen = new Set();
-    const rows = table.slice(1).map((r, index) => {
-        const admission = (r[iAdm] ?? "").trim();
-        const name = (r[iName] ?? "").trim();
-        const password = iPass >= 0 ? (r[iPass] ?? "").trim() : "";
-        const wanted = iSubj >= 0 ? (r[iSubj] ?? "").split(/[|;]/).map((s) => s.trim()).filter(Boolean) : [];
+    const rows = [];
+
+    table.slice(1).forEach((r, index) => {
+        if (!r.some((c) => text(c) !== "")) return;   // blank rows at the bottom of a sheet
+
+        const admission = text(r[iAdm]);
+        const name = text(r[iName]);
+        const password = iPass >= 0 ? text(r[iPass]) : "";
+        const wanted = iSubj >= 0 ? text(r[iSubj]).split(/[|;,]/).map((s) => s.trim()).filter(Boolean) : [];
 
         const subjects = [];
         let problem = null;
@@ -41,7 +58,7 @@ function readStudents(table) {
         if (!key) problem = "Missing admission number";
         else if (!name) problem = "Missing name";
         else if (seen.has(key)) problem = "Repeated in this file";
-        else if (password && password.length < 8) problem = "Password under 8 characters";
+        else if (password && password.length < 8) problem = "Password under 8 characters. Leave it empty to generate one";
 
         for (const raw of wanted) {
             const match = SUBJECTS.find((s) => s.toLowerCase() === raw.toLowerCase());
@@ -50,7 +67,7 @@ function readStudents(table) {
         }
 
         if (key) seen.add(key);
-        return { line: index + 2, admission, name, subjects, password, problem };
+        rows.push({ line: index + 2, admission, name, subjects, password, problem });
     });
 
     return { rows };
@@ -60,13 +77,31 @@ export default function ImportStudents() {
     const [fileName, setFileName] = useState("");
     const [rows, setRows] = useState([]);
     const [fileError, setFileError] = useState(null);
-    const [phase, setPhase] = useState("idle"); // idle | ready | importing | done
+    const [phase, setPhase] = useState("idle"); // idle | importing | done
     const [done, setDone] = useState(0);
     const [results, setResults] = useState([]);
     const [stopped, setStopped] = useState(null);
+    const [byUser, setByUser] = useState(false);
+    const [strict, setStrict] = useState(true);
+    const stopRef = useRef(false);
 
     const valid = rows.filter((r) => !r.problem);
     const invalid = rows.filter((r) => r.problem);
+    const blocked = strict && invalid.length > 0;
+
+    const created = results.filter((r) => r.status === "created");
+    const existed = results.filter((r) => r.status === "exists");
+    const failed = results.filter((r) => r.status === "error");
+
+    function reset() {
+        setFileName(""); setRows([]); setFileError(null); setPhase("idle");
+        setDone(0); setResults([]); setStopped(null); setByUser(false);
+    }
+
+    function cancel() {
+        if (created.length > 0 && !window.confirm("The passwords of the students just created can't be shown again. Leave without downloading them?")) return;
+        reset();
+    }
 
     function downloadTemplate() {
         const csv = toCsv(
@@ -89,52 +124,33 @@ export default function ImportStudents() {
             return;
         }
 
-        const ext = file.name.toLowerCase().split(".").pop();
-        let table;
+        reset();
+        let parsed;
         try {
-            if (ext === "xlsx" || ext === "xls") {
-                const XLSX = await import("xlsx");
-                const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-                const sheet = wb.Sheets[wb.SheetNames[0]];
-                table = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
-            } else if (ext === "csv" || ext === "txt") {
-                table = parseCsv(await file.text());
-            } else {
-                setFileError("Please choose a .csv or .xlsx file.");
-                return;
-            }
+            parsed = readStudents(await readTable(file));
         } catch (err) {
             console.error(err);
-            setFileError("That file couldn't be read. Make sure it isn't damaged or password-protected.");
+            setFileName(file.name);
+            setFileError(err.message?.startsWith("Use ") ? err.message : "That file couldn't be read. Make sure it isn't damaged or password-protected.");
             return;
         }
 
-        const parsed = readStudents(table);
         setFileName(file.name);
-        setResults([]);
-        setStopped(null);
-        setDone(0);
-
-        if (parsed.error) {
-            setFileError(parsed.error);
-            setRows([]);
-            setPhase("idle");
-            return;
-        }
-        setFileError(null);
+        if (parsed.error) { setFileError(parsed.error); return; }
         setRows(parsed.rows);
-        setPhase("ready");
     }
-    async function runImport() {
-        const todo = valid;
-        if (todo.length === 0) return;
 
-        setPhase("importing");
-        setStopped(null);
+    async function runImport() {
+        if (valid.length === 0 || blocked) return;
+
+        stopRef.current = false;
+        setPhase("importing"); setStopped(null); setByUser(false);
         const collected = [];
 
-        for (let i = 0; i < todo.length; i += BATCH) {
-            const batch = todo.slice(i, i + BATCH);
+        for (let i = 0; i < valid.length; i += BATCH) {
+            if (stopRef.current) { setByUser(true); break; }
+
+            const batch = valid.slice(i, i + BATCH);
             const res = await apiPost(
                 "/api/students/import",
                 {
@@ -148,21 +164,20 @@ export default function ImportStudents() {
                 90000
             );
 
-            if (!res.ok) {
-                setStopped(res.error);
-                break;
-            }
+            if (!res.ok) { setStopped(res.error); break; }
+
             collected.push(...res.results);
             setResults([...collected]);
             setDone(i + batch.length);
+
+            if (strict && res.results.some((r) => r.status === "error")) {
+                setStopped("A row failed on the server, so the import was stopped.");
+                break;
+            }
         }
 
         setPhase("done");
     }
-
-    const created = results.filter((r) => r.status === "created");
-    const existed = results.filter((r) => r.status === "exists");
-    const failed = results.filter((r) => r.status === "error");
 
     function downloadCredentials() {
         const csv = toCsv(
@@ -172,12 +187,12 @@ export default function ImportStudents() {
         downloadCsv(`student-logins-${new Date().toISOString().slice(0, 10)}.csv`, csv);
     }
 
+    // problems first, so they are never hidden below the fold
+    const shown = [...invalid, ...valid].slice(0, 25);
+
     return (
         <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-            <Link href="/Admin/user" className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-md px-2 text-xs"> <MoveLeft strokeWidth={1.5} size={17} />
-                {/* Users */}
-                Go back
-            </Link>
+            <Link href="/Admin/user" className="text-sm text-muted">← Users</Link>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">Import students</h1>
             <p className="mt-1 text-sm text-muted">
                 Upload a class list. Each student gets an account that's already approved, and logs in with their admission number.
@@ -186,8 +201,8 @@ export default function ImportStudents() {
             <section className="mt-6 rounded-xl border border-border bg-card p-6">
                 <h2 className="font-semibold">1. Prepare the file</h2>
                 <p className="mt-1 text-sm text-muted">
-                    A CSV with these columns: <span className="font-mono">admission_number</span>, <span className="font-mono">full_name</span>,
-                    and optionally <span className="font-mono">subjects</span> (separate with | ) and <span className="font-mono">password</span>.
+                    Excel or CSV with these columns: <span className="font-mono">admission_number</span>, <span className="font-mono">full_name</span>,
+                    and optionally <span className="font-mono">subjects</span> (separate with | or commas) and <span className="font-mono">password</span>.
                     Leave the password empty and one is generated for each student.
                 </p>
                 <button
@@ -201,9 +216,9 @@ export default function ImportStudents() {
 
             <section className="mt-4 rounded-xl border border-border bg-card p-6">
                 <h2 className="font-semibold">2. Choose the file</h2>
-                <label className="mt-3 inline-flex h-10 cursor-pointer items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-white">
-                    <Upload size={16} /> Choose CSV file
-                    <input type="file" accept="text/csv,.docx,.xlsx,.xls,.csv" onChange={onFile} disabled={phase === "importing"} className="sr-only" />
+                <label className={`mt-3 inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-white ${phase === "importing" ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+                    <Upload size={16} /> Choose file
+                    <input type="file" accept=".csv,.xlsx,.xls" onChange={onFile} disabled={phase === "importing"} className="sr-only" />
                 </label>
                 {fileName && <span className="ml-3 text-sm text-muted">{fileName}</span>}
                 {fileError && <p className="mt-3 text-sm text-red-600">{fileError}</p>}
@@ -211,8 +226,8 @@ export default function ImportStudents() {
                 {rows.length > 0 && (
                     <div className="mt-5">
                         <p className="text-sm">
-                            <span className="font-medium">{valid.length}</span> ready to import
-                            {invalid.length > 0 && <>, <span className="font-medium text-red-600">{invalid.length}</span> with problems (these are skipped)</>}.
+                            <span className="font-medium text-green-700">{valid.length} ready</span>
+                            {invalid.length > 0 && <>, <span className="font-medium text-red-600">{invalid.length} with problems</span></>}.
                         </p>
 
                         <div className="mt-3 overflow-x-auto rounded-lg border border-border">
@@ -227,7 +242,7 @@ export default function ImportStudents() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {rows.slice(0, 8).map((r) => (
+                                    {shown.map((r) => (
                                         <tr key={r.line} className="border-b border-border last:border-0">
                                             <td className="p-3 text-muted">{r.line}</td>
                                             <td className="p-3">{r.admission}</td>
@@ -241,13 +256,7 @@ export default function ImportStudents() {
                                 </tbody>
                             </table>
                         </div>
-                        {rows.length > 8 && <p className="mt-2 text-xs text-muted">and {rows.length - 8} more rows</p>}
-
-                        {invalid.length > 8 && (
-                            <p className="mt-2 text-xs text-red-600">
-                                {invalid.length} rows have problems. Fix the file and upload it again if they should be included.
-                            </p>
-                        )}
+                        {rows.length > shown.length && <p className="mt-2 text-xs text-muted">and {rows.length - shown.length} more rows</p>}
                     </div>
                 )}
             </section>
@@ -256,25 +265,68 @@ export default function ImportStudents() {
                 <section className="mt-4 rounded-xl border border-border bg-card p-6">
                     <h2 className="font-semibold">3. Import</h2>
 
-                    {phase !== "done" && (
-                        <button
-                            type="button"
-                            onClick={runImport}
-                            disabled={phase === "importing" || valid.length === 0}
-                            className="mt-3 inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-white cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                            {phase === "importing" ? `Importing... ${done} of ${valid.length}` : `Import ${valid.length} student${valid.length === 1 ? "" : "s"}`}
-                        </button>
+                    {phase === "idle" && (
+                        <div className="mt-3 max-w-xl">
+                            <Toggle
+                                checked={strict}
+                                onChange={setStrict}
+                                label="Cancel if any row has a problem"
+                                hint="On: nothing is imported until every row is valid. Off: rows with problems are skipped and the rest are imported."
+                            />
+                        </div>
                     )}
 
-                    {phase === "importing" && (
-                        <p className="mt-3 text-sm text-muted">Please keep this page open.</p>
+                    {blocked && phase === "idle" && (
+                        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                            Nothing will be imported while {invalid.length} row{invalid.length === 1 ? " has" : "s have"} a problem. Fix the file and choose it again, or turn the option off to import the {valid.length} good row{valid.length === 1 ? "" : "s"}.
+                        </p>
+                    )}
+
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                        {phase === "idle" && (
+                            <button
+                                type="button"
+                                onClick={runImport}
+                                disabled={valid.length === 0 || blocked}
+                                className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-white cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                Import {valid.length} student{valid.length === 1 ? "" : "s"}
+                            </button>
+                        )}
+
+                        {phase === "importing" && (
+                            <>
+                                <span className="text-sm text-muted">Importing... {done} of {valid.length}. Please keep this page open.</span>
+                                <button
+                                    type="button"
+                                    onClick={() => { stopRef.current = true; toast.message("Stopping after this batch..."); }}
+                                    className="inline-flex h-10 items-center rounded-md border border-red-300 bg-background px-5 text-sm font-medium text-red-600 cursor-pointer hover:bg-red-50"
+                                >
+                                    Stop import
+                                </button>
+                            </>
+                        )}
+
+                        {phase !== "importing" && (
+                            <button
+                                type="button"
+                                onClick={phase === "done" ? reset : cancel}
+                                className="inline-flex h-10 items-center rounded-md border border-input bg-background px-5 text-sm font-medium shadow-sm cursor-pointer hover:bg-accent"
+                            >
+                                {phase === "done" ? "Import another file" : "Cancel"}
+                            </button>
+                        )}
+                    </div>
+
+                    {byUser && (
+                        <p className="mt-3 rounded-lg border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">
+                            You stopped the import after {done} of {valid.length}. The {created.length} accounts already created stay. Download their logins below, then upload the same file again to continue. Existing accounts are skipped.
+                        </p>
                     )}
 
                     {stopped && (
                         <p className="mt-3 rounded-lg border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">
-                            The import stopped: {stopped} Upload the same file again to continue. Students already created are skipped.
-                            Download the logins below first, since the passwords are shown only once.
+                            The import stopped: {stopped} Accounts created before this point stay. Download their logins below, then upload the same file again to continue. Existing accounts are skipped.
                         </p>
                     )}
 
@@ -290,7 +342,7 @@ export default function ImportStudents() {
                                 <div className="rounded-lg border border-border bg-accent/30 p-4">
                                     <p className="font-medium">Download the logins now.</p>
                                     <p className="mt-1 text-muted">
-                                        Passwords can't be shown again later. Print or cut the sheet into slips. Each student must choose their own password at first login.
+                                        Passwords can't be shown again later. Each student must choose their own password at first login.
                                     </p>
                                     <button
                                         type="button"

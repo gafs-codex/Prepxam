@@ -1,7 +1,8 @@
 "use client"
 import Link from "next/link"
-import { Plus, Search, Pencil, Trash2 } from "lucide-react"
+import { Plus, Search, Pencil, Trash2, Copy } from "lucide-react"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import FilterDropdown from "@/components/FilterDropdown"
 import { supabase } from "@/lib/supabase"
 import { SectionLoader } from "@/components/ui/Spinner"
@@ -24,6 +25,8 @@ import {
 const QuestionType = ["All types", "Multiple choice", "True or false", "Fill in the gap"]
 
 export default function QuestionBank() {
+    const router = useRouter()
+
     const [questionType, setQuestionType] = useState("All types")
     const [search, setSearch] = useState("")
 
@@ -71,6 +74,41 @@ export default function QuestionBank() {
 
         setData((prev) => ({ ...prev, questions: prev.questions.filter((q) => q.id !== id) }));
         toast.success("Question has been deleted");
+    }
+
+    async function duplicate(q) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            toast.error("Your session has expired. Please log in again.");
+            return;
+        }
+
+        const { data: copy, error: copyError } = await safe(
+            supabase
+                .from("questions")
+                .insert({
+                    question_text: q.question_text,
+                    question_type: q.question_type,
+                    subject: q.subject,
+                    exam_type: q.exam_type,
+                    options: q.options,
+                    correct_index: q.correct_index,
+                    marks: q.marks,
+                    model_answer: q.model_answer,
+                    explanation: q.explanation,
+                    created_by: session.user.id,
+                })
+                .select()
+                .single(),
+            20000
+        );
+        if (copyError) {
+            notifyError(copyError, "Could not copy the question");
+            return;
+        }
+
+        toast.success("Copied. This one is yours to edit.");
+        router.push(`/Teacher/questions/${copy.id}/edit`);
     }
 
     const filteredQuestions = questions.filter((q) =>
@@ -151,7 +189,13 @@ export default function QuestionBank() {
                                 <div className="flex gap-2">
                                     {locked ? (
                                         <>
-                                            <span className={disabledBtn} title="Locked"><Pencil className="h-4 w-4" /></span>
+                                            <button
+                                                type="button"
+                                                onClick={() => duplicate(q)}
+                                                className="inline-flex h-9 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm cursor-pointer hover:bg-accent"
+                                            >
+                                                <Copy size={14} /> Copy & edit
+                                            </button>
                                             <span className={disabledBtn} title="Locked"><Trash2 className="h-4 w-4" color="red" /></span>
                                         </>
                                     ) : (

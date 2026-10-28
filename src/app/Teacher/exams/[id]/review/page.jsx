@@ -8,6 +8,7 @@ import { PageLoader } from "@/components/ui/Spinner"
 import ErrorState from "@/components/ui/ErrorState"
 import { useLoader } from "@/lib/useLoader"
 import { ensure, safe, notifyError } from "@/lib/net"
+import { Printer, MoveLeft } from "lucide-react"
 
 export default function ReviewExam() {
     const { id } = useParams();
@@ -110,11 +111,23 @@ export default function ReviewExam() {
 
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-            <Link href="/Teacher/exams" className="text-sm text-muted">← My exams</Link>
+            <Link href="/Teacher/exams" className="mb-4 inline-flex h-9 items-center gap-2 rounded-md border border-input bg-background px-3 text-xs font-medium shadow-sm cursor-pointer hover:bg-accent">
+                <MoveLeft strokeWidth={1.5} size={16} />
+                Back to my exams
+            </Link>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">{exam.title}</h1>
             <p className="mt-1 text-sm text-muted">
                 {exam.subject} · {exam.exam_type} · {exam.duration_minutes} min
             </p>
+
+
+            {/* <Link
+                href={`/Teacher/exams/${id}/print`}
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm cursor-pointer hover:bg-accent"
+            >
+                <Printer size={16} /> Print paper
+            </Link> */}
+
 
             {locked && (
                 <div className="mt-4 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800">

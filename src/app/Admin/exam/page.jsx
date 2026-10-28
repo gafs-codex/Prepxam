@@ -8,6 +8,7 @@ import { SectionLoader } from "@/components/ui/Spinner"
 import ErrorState from "@/components/ui/ErrorState"
 import { useLoader } from "@/lib/useLoader"
 import { ensure, safe, notifyError } from "@/lib/net"
+import { Printer } from "lucide-react"
 
 const FILTERS = ["pending", "approved", "rejected", "draft", "all"];
 
@@ -113,6 +114,8 @@ export default function AdminExams() {
                 <Link href="/Admin/questions/import" className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-white">
                     Import questions
                 </Link>
+
+
             </div>
 
             <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -213,6 +216,13 @@ export default function AdminExams() {
                                                 )}
                                                 <Link href={`/Admin/exam/${exam.id}`} className={outlineBtn}>
                                                     {exam.status === "approved" ? "View" : "Review"}
+                                                </Link>
+
+                                                <Link
+                                                    href={`/Admin/exam/${exam.id}/print`}
+                                                    className="inline-flex h-9 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm cursor-pointer hover:bg-accent"
+                                                >
+                                                    <Printer size={16} /> Print paper
                                                 </Link>
                                             </>
                                         )}

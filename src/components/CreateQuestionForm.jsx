@@ -10,7 +10,7 @@ import Toggle from "@/components/ui/Toggle";
 const QuestionTypes = ["Multiple choice", "True or false", "Fill in the gap"];
 const ExamTypes = ["Internal test", "WAEC", "NECO", "JAMB", "GCE"]
 
-export default function CreateQuestionForm({ onQuestionCreated, onCancel, lockedSubject, lockedExamType, submitLabel = "Save question", allowObjective = true, allowTheory = true }) {
+export default function CreateQuestionForm({ onQuestionCreated, onCancel, lockedSubject, lockedExamType, submitLabel = "Save question", allowObjective = true, allowTheory = true, onEnableSection }) {
 
     const [subjects, setSubjects] = useState([]);
     const [subjectState, setSubjectState] = useState("");
@@ -21,13 +21,15 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
     const [correctIndex, setCorrectIndex] = useState(null);
     const [explanation, setExplanation] = useState("");
     const [submitting, setSubmitting] = useState(false);
-    const [hasOptions, setHasOptions] = useState(true);
+    const [hasOptions, setHasOptions] = useState(allowObjective);
+    const useOptions = hasOptions;
+    const sectionMissing = useOptions ? !allowObjective : !allowTheory;
     const [marks, setMarks] = useState("5");
     const [modelAnswer, setModelAnswer] = useState("");
 
     // the exam's sections can force one kind
     const optionsLocked = !allowObjective || !allowTheory;
-    const useOptions = !allowTheory ? true : !allowObjective ? false : hasOptions;
+    // const useOptions = !allowTheory ? true : !allowObjective ? false : hasOptions;
 
     const subject = lockedSubject ?? subjectState;
     const examType = lockedExamType ?? examTypeState;
@@ -76,6 +78,11 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
     async function handleSubmit(e) {
         e.preventDefault();
         if (submitting) return;
+
+        if (sectionMissing) {
+            toast.error(`Turn on ${useOptions ? "Section A" : "Section B"} for this exam first`);
+            return;
+        }
 
         if (questionText.trim() === "") {
             toast.error("Question field cannot be empty");
@@ -171,12 +178,23 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
                     <Toggle
                         checked={useOptions}
                         onChange={setHasOptions}
-                        disabled={optionsLocked}
                         label="Answer options"
-                        hint={optionsLocked
-                            ? "Fixed by this exam's sections."
-                            : "On: the student picks an option (Section A). Off: the student writes an answer (Section B, theory)."}
+                        hint="On: the student picks an option. Off: a written (theory) question with marks."
                     />
+                    {sectionMissing && (
+                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">
+                            <span>This exam has no {useOptions ? "objective (Section A)" : "theory (Section B)"} section yet.</span>
+                            {onEnableSection && (
+                                <button
+                                    type="button"
+                                    onClick={() => onEnableSection(useOptions ? "objective" : "theory")}
+                                    className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-white cursor-pointer"
+                                >
+                                    Turn on {useOptions ? "Section A" : "Section B"}
+                                </button>
+                            )}
+                        </div>
+                    )}
 
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2 flex flex-col gap-2">
