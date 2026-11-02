@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import { Upload, Download } from "lucide-react"
 import { apiPost } from "@/lib/api"
 import { parseCsv, toCsv, downloadCsv } from "@/lib/csv"
-import { admissionKey } from "@/lib/admission"
+import { admissionKey, lastFourDigits } from "@/lib/admission";
 import { SUBJECTS } from "@/data/subjects"
 import Toggle from "@/components/ui/Toggle"
 
@@ -83,6 +83,7 @@ export default function ImportStudents() {
     const [stopped, setStopped] = useState(null);
     const [byUser, setByUser] = useState(false);
     const [strict, setStrict] = useState(true);
+    const [useDigits, setUseDigits] = useState(true);
     const stopRef = useRef(false);
 
     const valid = rows.filter((r) => !r.problem);
@@ -160,6 +161,7 @@ export default function ImportStudents() {
                         subjects: r.subjects,
                         password: r.password,
                     })),
+                    useAdmissionDigits: useDigits,
                 },
                 90000
             );
@@ -238,6 +240,7 @@ export default function ImportStudents() {
                                         <th className="p-3 font-medium">Admission no.</th>
                                         <th className="p-3 font-medium">Name</th>
                                         <th className="p-3 font-medium">Subjects</th>
+                                        <th className="p-3 font-medium">Password</th>
                                         <th className="p-3 font-medium">Check</th>
                                     </tr>
                                 </thead>
@@ -248,6 +251,9 @@ export default function ImportStudents() {
                                             <td className="p-3">{r.admission}</td>
                                             <td className="p-3">{r.name}</td>
                                             <td className="p-3 text-muted">{r.subjects.length || "none"}</td>
+                                            <td className="p-3 font-mono text-muted">
+                                                {r.password ? "from file" : useDigits ? (lastFourDigits(r.admission) ?? "generated") : "generated"}
+                                            </td>
                                             <td className="p-3">
                                                 {r.problem ? <span className="text-red-600">{r.problem}</span> : <span className="text-green-700">OK</span>}
                                             </td>
@@ -272,6 +278,13 @@ export default function ImportStudents() {
                                 onChange={setStrict}
                                 label="Cancel if any row has a problem"
                                 hint="On: nothing is imported until every row is valid. Off: rows with problems are skipped and the rest are imported."
+                            />
+                            
+                            <Toggle
+                                checked={useDigits}
+                                onChange={setUseDigits}
+                                label="Use the last 4 digits of the admission number as the password"
+                                hint="BC/STD/2021/0599 gets 0599. Students must choose their own password at first login. Off: a random password is generated for each student."
                             />
                         </div>
                     )}

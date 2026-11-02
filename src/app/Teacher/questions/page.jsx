@@ -39,6 +39,7 @@ export default function QuestionBank() {
                 .from("questions")
                 .select("*")
                 .eq("created_by", session.user.id)
+                .eq("archived", false)
                 .order("created_at", { ascending: false }),
             supabase.rpc("locked_question_ids"),
         ]);
@@ -57,23 +58,21 @@ export default function QuestionBank() {
     const lockedIds = data?.lockedIds ?? [];
 
     async function handleDelete(id) {
-        const { data: deleted, error: deleteError } = await safe(
-            supabase.from("questions").delete().eq("id", id).select(),
+        const { data: outcome, error: removeError } = await safe(
+            supabase.rpc("remove_question", { p_id: id }),
             20000
         );
-
-        if (deleteError) {
-            notifyError(deleteError, "Could not delete");
-            return;
-        }
-        // RLS can block a delete without an error, so check a row was really removed
-        if (!deleted || deleted.length === 0) {
-            toast.error("This question is used in a submitted or approved exam and can't be deleted.");
+        if (removeError) {
+            notifyError(removeError, "Could not remove it");
             return;
         }
 
         setData((prev) => ({ ...prev, questions: prev.questions.filter((q) => q.id !== id) }));
-        toast.success("Question has been deleted");
+        toast.success(
+            outcome === "archived"
+                ? "Removed from your bank. Exams that use it keep it."
+                : "Question has been deleted"
+        );
     }
 
     async function duplicate(q) {
@@ -180,56 +179,45 @@ export default function QuestionBank() {
                                                 title="Used in a pending or approved exam, or already answered by students"
                                                 className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800"
                                             >
-                                                In use · locked
+                                                {/* In use · locked */}
+                                                In use
                                             </span>
                                         )}
                                     </div>
                                 </div>
 
                                 <div className="flex gap-2">
-                                    {locked ? (
-                                        <>
-                                            <button
-                                                type="button"
-                                                onClick={() => duplicate(q)}
-                                                className="inline-flex h-9 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium shadow-sm cursor-pointer hover:bg-accent"
-                                            >
-                                                <Copy size={14} /> Copy & edit
-                                            </button>
-                                            <span className={disabledBtn} title="Locked"><Trash2 className="h-4 w-4" color="red" /></span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Link
-                                                href={`/Teacher/questions/${q.id}/edit`}
-                                                className="inline-flex items-center justify-center rounded-md border border-input bg-background shadow-sm hover:bg-accent h-9 w-9"
-                                            >
-                                                <Pencil className="h-4 w-4" />
-                                            </Link>
+                                    <Link
+                                        href={`/Teacher/questions/${q.id}/edit`}
+                                        title={locked ? "Used in an exam. Saving creates a new version" : "Edit"}
+                                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background shadow-sm hover:bg-accent"
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                    </Link>
 
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <button className="inline-flex items-center justify-center rounded-md border border-input bg-background shadow-sm hover:bg-accent h-9 w-9 text-destructive cursor-pointer">
-                                                        <Trash2 className="h-4 w-4" color="red" />
-                                                    </button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Delete this question?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            It will also be removed from any draft exam that uses it. This cannot be undone.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <div className="flex justify-end gap-2">
-                                                        <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDelete(q.id)} className="text-white cursor-pointer">
-                                                            Delete
-                                                        </AlertDialogAction>
-                                                    </div>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </>
-                                    )}
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <button className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-input bg-background text-destructive shadow-sm hover:bg-accent">
+                                                <Trash2 className="h-4 w-4" color="red" />
+                                            </button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>{locked ? "Remove this question from your bank?" : "Delete this question?"}</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    {locked
+                                                        ? "Exams that already use it keep their copy. It just disappears from your bank."
+                                                        : "It will also be removed from any draft exam that uses it. This cannot be undone."}
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <div className="flex justify-end gap-2">
+                                                <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDelete(q.id)} className="cursor-pointer text-white">
+                                                    {locked ? "Remove" : "Delete"}
+                                                </AlertDialogAction>
+                                            </div>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                 </div>
                             </div>
                         );

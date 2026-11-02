@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import PasswordInput from "@/components/PasswordInput";
-import { admissionEmail } from "@/lib/admission";
+import { admissionEmail, loginPassword } from "@/lib/admission";
 import { notifyError, safe } from "@/lib/net";
 
 export default function Login() {
@@ -32,10 +32,14 @@ export default function Login() {
         setSubmitting(true);
 
         // an "@" means an email (teachers, admins). Anything else is an admission number.
-        const loginEmail = typed.includes("@") ? typed.toLowerCase() : admissionEmail(typed);
+        const isAdmission = !typed.includes("@");
+        const loginEmail = isAdmission ? admissionEmail(typed) : typed.toLowerCase();
 
         const { data, error } = await safe(
-            supabase.auth.signInWithPassword({ email: loginEmail, password }),
+            supabase.auth.signInWithPassword({
+                email: loginEmail,
+                password: isAdmission ? loginPassword(password) : password,
+            }),
             20000
         );
 

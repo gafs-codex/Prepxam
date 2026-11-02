@@ -1,4 +1,5 @@
 import { requireAdmin, makePassword, writeAudit, reply } from "@/lib/serverAuth"
+import { lastFourDigits, loginPassword } from "@/lib/admission"
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -25,8 +26,12 @@ export async function POST(request) {
         return reply({ error: "Admin passwords can't be reset here." }, 403)
     }
 
-    const password = makePassword(10)
-    const { error } = await service.auth.admin.updateUserById(userId, { password })
+    // students get the last 4 digits of their admission number. Teachers get a random password
+    const shown = target.role === "student" && target.admission_number
+        ? (lastFourDigits(target.admission_number) ?? makePassword(10))
+        : makePassword(10)
+
+    const { error } = await service.auth.admin.updateUserById(userId, { password: loginPassword(shown) })
     if (error) return reply({ error: "Could not reset the password. Nothing was changed." }, 400)
 
     await service.from("profiles").update({ must_change_password: true }).eq("id", userId)

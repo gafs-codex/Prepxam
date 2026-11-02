@@ -22,6 +22,7 @@ export default function EditQuestion() {
     const [explanation, setExplanation] = useState("");
     const [marks, setMarks] = useState("5");
     const [modelAnswer, setModelAnswer] = useState("");
+    const [inUse, setInUse] = useState(false);
 
     const { data, error, loading, reload } = useLoader(async () => {
         const [questionRes, lockedRes] = await Promise.all([
@@ -48,7 +49,7 @@ export default function EditQuestion() {
         setExplanation(q.explanation || "");
         setMarks(String(q.marks ?? 5));
         setModelAnswer(q.model_answer ?? "");
-        setLocked(data.locked);
+        setInUse(data.locked);
     }, [data]);
 
     const isTheory = data?.question?.question_type === "Theory";
@@ -92,7 +93,7 @@ export default function EditQuestion() {
 
         setSaving(true);
         const { data: saved, error: saveError } = await safe(
-            supabase.from("questions").update(changes).eq("id", id).select(),
+            supabase.rpc("save_question_edit", { p_id: id, p_changes: changes }),
             20000
         );
         setSaving(false);
@@ -101,13 +102,12 @@ export default function EditQuestion() {
             notifyError(saveError, "Failed to save");
             return;
         }
-        if (!saved || saved.length === 0) {
-            toast.error("This question is used in a submitted or approved exam and can't be changed.");
-            setLocked(true);
-            return;
-        }
 
-        toast.success("Question updated");
+        toast.success(
+            saved?.forked
+                ? "Saved as a new version. Exams that already use this question keep the original."
+                : "Question updated"
+        );
         router.push("/Teacher/questions");
     }
 
@@ -129,9 +129,9 @@ export default function EditQuestion() {
             </Link>
             <h1 className="text-2xl font-semibold tracking-tight">Edit question</h1>
 
-            {locked && (
-                <div className="mt-4 max-w-3xl rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800">
-                    This question can't be edited because it's used in an exam that is pending or approved, or students have already answered it. Go back to the question bank and use "Copy & edit" to make an editable copy.
+            {inUse && (
+                <div className="mt-4 max-w-3xl rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                    This question is used in an exam. When you save, your changes become a new version in your bank. Exams that already use it keep the original, and draft exams switch to the new version.
                 </div>
             )}
 

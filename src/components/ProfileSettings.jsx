@@ -135,7 +135,10 @@ export default function ProfileSettings() {
         // Supabase doesn't check the old password itself, so verify it first
         const loginEmail = profile.email ?? admissionEmail(profile.admission_number);
         const { error: checkError } = await safe(
-            supabase.auth.signInWithPassword({ email: loginEmail, password: currentPassword }),
+            supabase.auth.signInWithPassword({
+                email: loginEmail,
+                password: profile.email ? currentPassword : loginPassword(currentPassword),
+            }),
             20000
         );
         if (checkError) {

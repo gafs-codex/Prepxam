@@ -118,7 +118,7 @@ export async function POST(request) {
             for (const [subject, examType] of groups.values()) {
                 const { data, error } = await service
                     .from("questions").select("question_text")
-                    .eq("created_by", ownerId).eq("subject", subject).eq("exam_type", examType)
+                    .eq("created_by", ownerId).eq("subject", subject).eq("exam_type", examType).eq("archived", false)
                     .range(0, 4999)
                 if (error) throw error
                 for (const e of data ?? []) {

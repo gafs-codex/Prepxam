@@ -8,6 +8,7 @@ import { SectionLoader } from "@/components/ui/Spinner"
 import ErrorState from "@/components/ui/ErrorState"
 import { useLoader } from "@/lib/useLoader"
 import { ensure } from "@/lib/net"
+import { displayId } from "@/lib/admission"
 
 function formatDate(value) {
     return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -26,7 +27,7 @@ export default function TeacherStudents() {
     const subjectOptions = ["All subjects", ...new Set(students.flatMap((s) => s.shared_subjects ?? []))];
 
     const visible = students.filter((s) => {
-        const text = `${s.full_name ?? ""} ${s.email ?? ""}`.toLowerCase();
+        const text = `${s.full_name ?? ""} ${displayId(s)}`.toLowerCase();
         return text.includes(search.toLowerCase()) &&
             (subject === "All subjects" || (s.shared_subjects ?? []).includes(subject));
     });
@@ -45,7 +46,7 @@ export default function TeacherStudents() {
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search by name or email"
+                        placeholder="Search by name or admission number"
                         className="flex h-9 w-full rounded-md border border-input bg-transparent pl-10 pr-3 py-1 text-base shadow-sm outline-none md:text-sm"
                     />
                 </div>
@@ -71,7 +72,7 @@ export default function TeacherStudents() {
                             <thead>
                                 <tr className="border-b border-border bg-accent/30 text-left text-muted">
                                     <th className="p-4 font-medium">Name</th>
-                                    <th className="p-4 font-medium">Email / admission no.</th>
+                                    <th className="p-4 font-medium">Admission no.</th>
                                     <th className="p-4 font-medium">Subjects</th>
                                     <th className="p-4 font-medium">Exams taken</th>
                                     <th className="p-4 font-medium">Average score</th>
@@ -87,7 +88,9 @@ export default function TeacherStudents() {
                                                 {s.full_name ?? "Unnamed"}
                                             </Link>
                                         </td>
-                                        <td className="p-4 text-muted">{s.email ?? s.admission_number ?? "—"}</td>
+                                        <td className="p-4 text-muted">
+                                            {displayId(s)}
+                                        </td>
                                         <td className="p-4">
                                             <div className="flex flex-wrap gap-1">
                                                 {(s.shared_subjects ?? []).map((name) => (

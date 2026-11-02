@@ -28,7 +28,7 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
     const [modelAnswer, setModelAnswer] = useState("");
 
     // the exam's sections can force one kind
-    const optionsLocked = !allowObjective || !allowTheory;
+    // const optionsLocked = !allowObjective || !allowTheory;
     // const useOptions = !allowTheory ? true : !allowObjective ? false : hasOptions;
 
     const subject = lockedSubject ?? subjectState;
@@ -157,6 +157,8 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
         setOptions(isTrueFalse ? ["True", "False"] : ["", "", "", ""]);
         setCorrectIndex(null);
         setExplanation("");
+        setMarks("5");
+        setModelAnswer("");
     }
 
     const lockedBoxClass =
@@ -229,69 +231,97 @@ export default function CreateQuestionForm({ onQuestionCreated, onCancel, locked
                         </div>
                     </div>
 
-                    <div className="space-y-3">
-                        <label className="text-sm font-medium leading-none">
-                            Answer options — select the correct one
-                        </label>
-
-                        {isFillGap && (
-                            <p className="text-sm text-muted">
-                                Write the sentence with a gap, e.g. "The SI unit of force is ____." Then give the options below.
-                            </p>
-                        )}
-
-                        <div role="radiogroup" className="grid gap-2 space-y-2 mt-2.5">
-                            {options.map((option, index) => (
-                                <div key={index} className="flex items-center gap-3">
-                                    <input
-                                        type="radio"
-                                        name="correctOption"
-                                        id={`option-${index}`}
-                                        checked={correctIndex === index}
-                                        onChange={() => setCorrectIndex(index)}
-                                        className="cursor-pointer accent-blue-600 focus:ring-blue-500 h-5 w-5"
-                                    />
-                                    {isTrueFalse ? (
-                                        <label htmlFor={`option-${index}`} className="cursor-pointer text-sm">
-                                            {option}
-                                        </label>
-                                    ) : (
-                                        <input
-                                            type="text"
-                                            value={option}
-                                            onChange={(e) => updateOption(index, e.target.value)}
-                                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm md:text-sm outline-none"
-                                            placeholder={`Option ${String.fromCharCode(65 + index)}`}
-                                        />
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="space-y-2">
+                    {useOptions ? (
+                        <div className="space-y-3">
                             <label className="text-sm font-medium leading-none">
-                                Explanation (shown after the exam)
+                                Answer options — select the correct one
                             </label>
 
-                            <textarea
-                                value={explanation}
-                                onChange={(e) => setExplanation(e.target.value)}
-                                className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted outline-none"
-                            />
-                        </div>
+                            {isFillGap && (
+                                <p className="text-sm text-muted">
+                                    Write the sentence with a gap, e.g. "The SI unit of force is ____." Then give the options below.
+                                </p>
+                            )}
 
-                        <div className="flex gap-3 items-center">
-                            <button type="submit" disabled={submitting} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer bg-primary text-white shadow hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-60 disabled:cursor-not-allowed">
-                                {submitting ? "Saving..." : submitLabel}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={onCancel}
-                                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
-                                Cancel
-                            </button>
+                            <div role="radiogroup" className="grid gap-2 space-y-2 mt-2.5">
+                                {options.map((option, index) => (
+                                    <div key={index} className="flex items-center gap-3">
+                                        <input
+                                            type="radio"
+                                            name="correctOption"
+                                            id={`option-${index}`}
+                                            checked={correctIndex === index}
+                                            onChange={() => setCorrectIndex(index)}
+                                            className="cursor-pointer accent-blue-600 focus:ring-blue-500 h-5 w-5"
+                                        />
+                                        {isTrueFalse ? (
+                                            <label htmlFor={`option-${index}`} className="cursor-pointer text-sm">
+                                                {option}
+                                            </label>
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                value={option}
+                                                onChange={(e) => updateOption(index, e.target.value)}
+                                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm md:text-sm outline-none"
+                                                placeholder={`Option ${String.fromCharCode(65 + index)}`}
+                                            />
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
+                    ) : (
+                        <div className="grid gap-4 sm:grid-cols-[8rem_1fr]">
+                            <div className="space-y-2">
+                                <label htmlFor="marks" className="text-sm font-medium leading-none">Marks</label>
+                                <input
+                                    id="marks"
+                                    type="number"
+                                    min={1}
+                                    max={100}
+                                    value={marks}
+                                    onChange={(e) => setMarks(e.target.value)}
+                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm outline-none"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label htmlFor="modelAnswer" className="text-sm font-medium leading-none">
+                                    Marking guide (only you see this)
+                                </label>
+                                <textarea
+                                    id="modelAnswer"
+                                    value={modelAnswer}
+                                    onChange={(e) => setModelAnswer(e.target.value)}
+                                    className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm outline-none"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="space-y-2">
+                        <label htmlFor="explanation" className="text-sm font-medium leading-none">
+                            Explanation (shown after the exam)
+                        </label>
+                        <textarea
+                            id="explanation"
+                            value={explanation}
+                            onChange={(e) => setExplanation(e.target.value)}
+                            className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted outline-none"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <button type="submit" disabled={submitting} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer bg-primary text-white shadow hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-60 disabled:cursor-not-allowed">
+                            {submitting ? "Saving..." : submitLabel}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
+                            Cancel
+                        </button>
                     </div>
                 </form>
             </div>

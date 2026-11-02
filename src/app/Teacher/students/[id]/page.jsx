@@ -6,6 +6,8 @@ import { PageLoader } from "@/components/ui/Spinner"
 import ErrorState from "@/components/ui/ErrorState"
 import { useLoader } from "@/lib/useLoader"
 import { ensure } from "@/lib/net"
+import { displayId } from "@/lib/admission"
+import { MoveLeft } from "lucide-react"
 
 function formatDate(value) {
     return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -63,9 +65,14 @@ export default function TeacherStudentDetail() {
 
     return (
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-            <Link href="/Teacher/students" className="text-sm text-muted">← Students</Link>
+
+            <Link href="/Teacher/students" className="mb-4 inline-flex h-8 items-center gap-2 rounded-md border border-input bg-background px-2 text-xs font-medium shadow-sm cursor-pointer hover:bg-accent">
+                <MoveLeft strokeWidth={1.5} size={16} />
+                Students
+            </Link>
+
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">{student.full_name ?? "Unnamed"}</h1>
-            <p className="mt-1 text-sm text-muted">{student.email ?? student.admission_number ?? "No email"} · joined {formatDate(student.created_at)}</p>
+            <p className="mt-1 text-sm text-muted">{displayId(student)} · joined {formatDate(student.created_at)}</p>
             <div className="mt-3 flex flex-wrap gap-1">
                 {(student.shared_subjects ?? []).map((name) => (
                     <span key={name} className="rounded-full bg-accent px-2.5 py-0.5 text-xs">{name}</span>

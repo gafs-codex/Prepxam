@@ -20,6 +20,7 @@ export default function AddFromBank({ onAddSelected, subject, examType, addedIds
                 .select("*")
                 .eq("subject", subject)
                 .eq("exam_type", examType)
+                .eq("archived", false)
         )
         return data ?? []
     }, [subject, examType])

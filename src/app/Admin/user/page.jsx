@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase"
 import { PageLoader, SectionLoader } from "@/components/ui/Spinner"
 import ErrorState from "@/components/ui/ErrorState"
 import { friendlyMessage, notifyError, safe, withTimeout } from "@/lib/net"
+import { displayId } from "@/lib/admission"
 
 
 const ROLES = [
@@ -208,7 +209,10 @@ export default function AdminUsers() {
                                 <div>
                                     <p className="font-medium">{u.full_name ?? "Unnamed"}</p>
                                     <p className="text-sm text-muted">
-                                        {u.email ?? u.admission_number ?? "No email"} · registered {formatDate(u.created_at)}
+                                        {/* {u.email ?? u.admission_number ?? "No email"}  */}
+                                        {displayId(u)}
+                                        · registered
+                                        {formatDate(u.created_at)}
                                     </p>
                                 </div>
 
